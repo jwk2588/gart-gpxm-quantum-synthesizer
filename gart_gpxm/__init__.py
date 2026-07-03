@@ -1,280 +1,54 @@
 """GART v3.0 + GPXM Quantum Linguistic Synthesizer.
 
-A dual-swarm AI music production system combining the Generative
-Adversarial Rap Tournament (GART) with Genetic Persona & Expansive
-Memory (GPXM) frameworks.
-
-Top-level package exports.
+A dual-swarm AI music production system combining:
+- GART: Generative Adversarial Rap Tournament
+- GPXM: Genetic Persona & Expansive Memory framework
+- LLLM: Latent Linguistic Lil Model (PyTorch cross-attention)
+- Stash Box reconstruction engine (Tay B + Lil Durk)
+- Diagram-to-Code Inversion Agent
+- Adaptive Resilience (Moore's Law vs Murphy's Law)
 """
 
-from __future__ import annotations
-
-# Core modules
-from gart_gpxm.core.lllm_architecture import (
-    LLLM_Architecture,
-    LLLM_Config,
-    LLLM_TrainingPipeline,
-    PositionalEncoding,
-    V1Encoder,
-    V2Encoder,
-    CrossAttentionFusion,
-    OutputDecoder,
-    TrainingConfig,
-    TrainingHistory,
-    generate_square_subsequent_mask,
-)
-
-from gart_gpxm.core.daw_utilities import (
-    AudioSignal,
-    EQProfile,
-    ReverbConfig,
-    DAWConfig,
-    DAW_SubAgent_Utilities,
-    VerseStem,
-    Pattern,
-    Note,
-    CadenceShiftedText,
-    generate_ybnba_kick_pattern,
-    generate_hive_synth_riff,
-)
-
-from gart_gpxm.core.dual_swarm_orchestrator import (
-    MatchupConfig,
-    BattleResult,
-    TournamentResult,
-    SwarmCoordinationResult,
-    LinguisticEngine,
-    VerseConstructor,
-    StemGenerator,
-    LinguisticDAW,
-    HiveMindAggregator,
-    StyleSynthesizer,
-    EntropyInjector,
-    FrankensteinHiveMind,
-    SidechainCompressor,
-    MasterMixerEvaluator,
-    DualSwarmOrchestrator,
-)
-
-# GPXM modules
-from gart_gpxm.gpxm.genetic_persona import (
-    VoiceDifferentiationParameters,
-    EntropicScript,
-    MemoryEntry,
-    SessionMemory,
-    ProjectMemory,
-    CoreIdentityMemory,
-    Episode,
-    EventMemory,
-    Fact,
-    KnowledgeGraph,
-    KnowledgeMemory,
-    ConsolidationResult,
-    ExpansiveMemoryBank,
-    GeneticPersona,
-)
-
-from gart_gpxm.gpxm.entropic_scripting import (
-    VocabularyMatrix,
-    FlowArchitecture,
-    ThematicEngine,
-    ProsodicFeatures,
-    CulturalSemantics,
-    Guardrails,
-    EntropicScript,
-    EntropyLevel,
-    EntropyController,
-)
-
-from gart_gpxm.gpxm.roster_manager import (
-    SlotInfo,
-    RosterError,
-    RosterFullError,
-    DuplicateArtistError,
-    RosterManager,
-    cosine_similarity,
-)
-
-# Inversion module
-from gart_gpxm.inversion.diagram_to_code_agent import (
-    Token,
-    ASTNode,
-    ClassNode,
-    MethodNode,
-    Edge,
-    MermaidAST,
-    MermaidLexer,
-    MermaidASTParser,
-    DependencyMapper,
-    PythonCodeGenerator,
-    DiagramToCodeInversionAgent,
-)
-
-# Resilience module
-from gart_gpxm.resilience.adaptive_engine import (
-    FailureSeverity,
-    DegradedMode,
-    FailureEvent,
-    RecoveryAction,
-    SystemState,
-    AdaptationDecision,
-    AdaptationEvent,
-    EntropyRegulator,
-    GracefulDegradation,
-    FeedbackLoop,
-    AdaptiveResilienceEngine,
-)
-
-# Tournament module
-from gart_gpxm.tournament.tournament_engine import (
-    BattleResult as TBattleResult,
-    LeaderboardEntry,
-    TournamentResult as TTournamentResult,
-    ScoringEngine,
-    EloRatingSystem,
-    MatchupSimulator,
-    TournamentBracket,
-    TournamentEngine,
-)
-
-# Stash Box module
-from gart_gpxm.stash_box.reconstruction_engine import (
-    StyleBrief,
-    BeatPattern,
-    LyricalSection,
-    TrackConcept,
-    BlendedStyle,
-    StashBoxReconstructionEngine,
-)
-
-# Cross-platform module
-from gart_gpxm.cross_platform.adapter import (
-    Platform,
-    ContentTransformer,
-    LinkedInTransformer,
-    TwitterTransformer,
-    GitHubReadmeTransformer,
-    WeChatTransformer,
-    ZhihuTransformer,
-    CrossPlatformAdapter,
-)
-
 __version__ = "3.0.0"
-__author__ = "GART Architecture Team"
+__author__ = "GART-GPXM Team"
+__license__ = "MIT"
+
+# Lazy imports for heavy modules
+def _lazy_import(name):
+    import importlib
+    return importlib.import_module(f"gart_gpxm.{name}")
+
+# Version info
+VERSION = __version__
+VERSION_TUPLE = tuple(map(int, __version__.split(".")))
+
+# Module availability
+MODULES = {
+    "core": ["lllm_architecture", "daw_utilities", "dual_swarm_orchestrator"],
+    "gpxm": ["genetic_persona", "entropic_scripting", "roster_manager"],
+    "inversion": ["diagram_to_code_agent"],
+    "resilience": ["adaptive_engine"],
+    "tournament": ["tournament_engine"],
+    "stash_box": ["reconstruction_engine"],
+    "cross_platform": ["adapter"],
+}
+
+def get_module_status():
+    """Return availability status of all modules."""
+    status = {}
+    for pkg, modules in MODULES.items():
+        for mod in modules:
+            try:
+                _lazy_import(f"{pkg}.{mod}")
+                status[f"{pkg}.{mod}"] = "available"
+            except ImportError as e:
+                status[f"{pkg}.{mod}"] = f"unavailable: {e}"
+    return status
 
 __all__ = [
-    # LLLM
-    "LLLM_Architecture",
-    "LLLM_Config",
-    "LLLM_TrainingPipeline",
-    "PositionalEncoding",
-    "V1Encoder",
-    "V2Encoder",
-    "CrossAttentionFusion",
-    "OutputDecoder",
-    "TrainingConfig",
-    "TrainingHistory",
-    # DAW
-    "AudioSignal",
-    "EQProfile",
-    "ReverbConfig",
-    "DAWConfig",
-    "DAW_SubAgent_Utilities",
-    "VerseStem",
-    "Pattern",
-    "Note",
-    "CadenceShiftedText",
-    # Dual Swarm
-    "MatchupConfig",
-    "BattleResult",
-    "TournamentResult",
-    "SwarmCoordinationResult",
-    "LinguisticEngine",
-    "VerseConstructor",
-    "StemGenerator",
-    "LinguisticDAW",
-    "HiveMindAggregator",
-    "StyleSynthesizer",
-    "EntropyInjector",
-    "FrankensteinHiveMind",
-    "SidechainCompressor",
-    "MasterMixerEvaluator",
-    "DualSwarmOrchestrator",
-    # GPXM
-    "VoiceDifferentiationParameters",
-    "MemoryEntry",
-    "SessionMemory",
-    "ProjectMemory",
-    "CoreIdentityMemory",
-    "Episode",
-    "EventMemory",
-    "Fact",
-    "KnowledgeGraph",
-    "KnowledgeMemory",
-    "ConsolidationResult",
-    "ExpansiveMemoryBank",
-    "GeneticPersona",
-    # Entropic Scripting
-    "VocabularyMatrix",
-    "FlowArchitecture",
-    "ThematicEngine",
-    "ProsodicFeatures",
-    "CulturalSemantics",
-    "Guardrails",
-    "EntropyLevel",
-    "EntropyController",
-    # Roster
-    "SlotInfo",
-    "RosterError",
-    "RosterFullError",
-    "DuplicateArtistError",
-    "RosterManager",
-    "cosine_similarity",
-    # Inversion
-    "Token",
-    "ASTNode",
-    "ClassNode",
-    "MethodNode",
-    "Edge",
-    "MermaidAST",
-    "MermaidLexer",
-    "MermaidASTParser",
-    "DependencyMapper",
-    "PythonCodeGenerator",
-    "DiagramToCodeInversionAgent",
-    # Resilience
-    "FailureSeverity",
-    "DegradedMode",
-    "FailureEvent",
-    "RecoveryAction",
-    "SystemState",
-    "AdaptationDecision",
-    "AdaptationEvent",
-    "EntropyRegulator",
-    "GracefulDegradation",
-    "FeedbackLoop",
-    "AdaptiveResilienceEngine",
-    # Tournament
-    "LeaderboardEntry",
-    "ScoringEngine",
-    "EloRatingSystem",
-    "MatchupSimulator",
-    "TournamentBracket",
-    "TournamentEngine",
-    # Stash Box
-    "StyleBrief",
-    "BeatPattern",
-    "LyricalSection",
-    "TrackConcept",
-    "BlendedStyle",
-    "StashBoxReconstructionEngine",
-    # Cross-platform
-    "Platform",
-    "ContentTransformer",
-    "LinkedInTransformer",
-    "TwitterTransformer",
-    "GitHubReadmeTransformer",
-    "WeChatTransformer",
-    "ZhihuTransformer",
-    "CrossPlatformAdapter",
+    "__version__",
+    "VERSION",
+    "VERSION_TUPLE",
+    "MODULES",
+    "get_module_status",
 ]
