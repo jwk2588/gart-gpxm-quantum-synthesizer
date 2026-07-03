@@ -1,0 +1,174 @@
+{
+  "roster_version": "3.0.0",
+  "generated_at": "2025-01-15T00:00:00Z",
+  "entries": [
+    {
+      "persona_id": "tay_b_founder_001",
+      "artist_name": "Tay B",
+      "status": "active",
+      "tier": "founder",
+      "generation": 0,
+      "parent_ids": [],
+      "child_ids": ["tay_durk_hybrid_001"],
+      "skills": {
+        "flow_complexity": 0.82,
+        "rhyme_density": 0.75,
+        "thematic_depth": 0.68,
+        "cultural_entropy": 0.72,
+        "vocal_presence": 0.88,
+        "melodic_sense": 0.91,
+        "emotional_delivery": 0.85,
+        "breath_control": 0.79,
+        "wordplay": 0.70,
+        "storytelling": 0.65,
+        "ad_lib_style": 0.60,
+        "beat_selection": 0.83
+      },
+      "metadata": {
+        "region": "melodic_trap",
+        "style_family": "emotional_melodic",
+        "key_tracks": ["melodic_survival", "emotional_peak"],
+        "bpm_range": [120, 140],
+        "signature_traits": ["melodic_triplets", "emotional_crescendo", "piano_alignment"]
+      },
+      "created_at": "2025-01-15T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    },
+    {
+      "persona_id": "lil_durk_founder_002",
+      "artist_name": "Lil Durk",
+      "status": "active",
+      "tier": "founder",
+      "generation": 0,
+      "parent_ids": [],
+      "child_ids": ["tay_durk_hybrid_001"],
+      "skills": {
+        "flow_complexity": 0.88,
+        "rhyme_density": 0.82,
+        "thematic_depth": 0.91,
+        "cultural_entropy": 0.85,
+        "vocal_presence": 0.86,
+        "melodic_sense": 0.72,
+        "emotional_delivery": 0.90,
+        "breath_control": 0.84,
+        "wordplay": 0.78,
+        "storytelling": 0.93,
+        "ad_lib_style": 0.75,
+        "beat_selection": 0.80
+      },
+      "metadata": {
+        "region": "chicago_drill",
+        "style_family": "narrative_drill",
+        "key_tracks": ["street_narrative", "loyalty_loop"],
+        "bpm_range": [130, 150],
+        "signature_traits": ["drill_cadence", "street_authenticity", "narrative_depth"]
+      },
+      "created_at": "2025-01-15T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    },
+    {
+      "persona_id": "tay_durk_hybrid_001",
+      "artist_name": "TayDurk Hybrid",
+      "status": "active",
+      "tier": "prospect",
+      "generation": 1,
+      "parent_ids": ["tay_b_founder_001", "lil_durk_founder_002"],
+      "child_ids": [],
+      "skills": {
+        "flow_complexity": 0.85,
+        "rhyme_density": 0.79,
+        "thematic_depth": 0.80,
+        "cultural_entropy": 0.79,
+        "vocal_presence": 0.87,
+        "melodic_sense": 0.82,
+        "emotional_delivery": 0.88,
+        "breath_control": 0.82,
+        "wordplay": 0.74,
+        "storytelling": 0.79,
+        "ad_lib_style": 0.68,
+        "beat_selection": 0.82
+      },
+      "metadata": {
+        "region": "hybrid_melodic_drill",
+        "style_family": "melodic_narrative",
+        "crossover_type": "technical_creative",
+        "parent_contribution": {
+          "tay_b": ["melodic_sense", "emotional_delivery"],
+          "lil_durk": ["storytelling", "cultural_entropy", "thematic_depth"]
+        }
+      },
+      "created_at": "2025-01-15T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    },
+    {
+      "persona_id": "yb_nba_anchor_003",
+      "artist_name": "YBNBA Anchor",
+      "status": "active",
+      "tier": "founder",
+      "generation": 0,
+      "parent_ids": [],
+      "child_ids": [],
+      "skills": {
+        "flow_complexity": 0.75,
+        "rhyme_density": 0.68,
+        "thematic_depth": 0.70,
+        "cultural_entropy": 0.65,
+        "vocal_presence": 0.82,
+        "melodic_sense": 0.78,
+        "emotional_delivery": 0.76,
+        "breath_control": 0.71,
+        "wordplay": 0.62,
+        "storytelling": 0.72,
+        "ad_lib_style": 0.80,
+        "beat_selection": 0.77
+      },
+      "metadata": {
+        "role": "piano_anchor",
+        "function": "antagonist_stem",
+        "bpm_anchor": 130,
+        "key": "C_minor",
+        "signature_traits": ["piano_riff_generation", "harmonic_support"]
+      },
+      "created_at": "2025-01-15T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    },
+    {
+      "persona_id": "hive_mind_004",
+      "artist_name": "HiveMind Synthesizer",
+      "status": "active",
+      "tier": "contender",
+      "generation": 0,
+      "parent_ids": [],
+      "child_ids": [],
+      "skills": {
+        "flow_complexity": 0.90,
+        "rhyme_density": 0.85,
+        "thematic_depth": 0.75,
+        "cultural_entropy": 0.70,
+        "vocal_presence": 0.80,
+        "melodic_sense": 0.76,
+        "emotional_delivery": 0.72,
+        "breath_control": 0.85,
+        "wordplay": 0.88,
+        "storytelling": 0.68,
+        "ad_lib_style": 0.55,
+        "beat_selection": 0.74
+      },
+      "metadata": {
+        "role": "amalgamated_opponent",
+        "function": "frankenstein_hive_mind",
+        "composition": "multi_artist_blend",
+        "signature_traits": ["style_synthesis", "entropy_injection", "consensus_voting"]
+      },
+      "created_at": "2025-01-15T00:00:00Z",
+      "updated_at": "2025-01-15T00:00:00Z"
+    }
+  ],
+  "metadata": {
+    "total_entries": 5,
+    "founders": 3,
+    "hybrids": 1,
+    "specialized": 1,
+    "generations": 2
+  }
+}

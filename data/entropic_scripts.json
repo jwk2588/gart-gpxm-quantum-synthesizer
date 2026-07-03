@@ -1,0 +1,161 @@
+{
+  "scripts_version": "3.0.0",
+  "generated_at": "2025-01-15T00:00:00Z",
+  "scripts": [
+    {
+      "script_id": "es_001",
+      "name": "Melodic Survival",
+      "artists": ["Tay B", "Lil Durk"],
+      "entropy_score": 0.84,
+      "pattern": {
+        "structure": ["HOOK", "VERSE_NARRATIVE", "BRIDGE_EMOTIONAL", "VERSE_RESPONSE"],
+        "bpm_range": [125, 135],
+        "key": "C_minor",
+        "energy_curve": "building",
+        "emotional_arc": "struggle_to_triumph"
+      },
+      "linguistic_markers": {
+        "slang_density": 0.72,
+        "regional_markers": ["chicago_drill", "melodic_trap"],
+        "emotional_cues": ["survival", "loyalty", "perseverance"],
+        "narrative_mode": "first_person"
+      },
+      "musical_markers": {
+        "primary_instrument": "piano",
+        "drum_pattern": "trap_standard",
+        "hi_hat_speed": "fast_rolls",
+        "808_presence": "heavy",
+        "melody_complexity": "high"
+      },
+      "genetic_expression": {
+        "dominant_traits": ["FLOW_COMPLEXITY", "EMOTIONAL_RANGE", "STORYTELLING"],
+        "recessive_traits": ["AD_LIB_STYLE", "PUNCHLINE_DENSITY"],
+        "expression_threshold": 0.65
+      }
+    },
+    {
+      "script_id": "es_002",
+      "name": "Drill Melancholy",
+      "artists": ["Lil Durk"],
+      "entropy_score": 0.79,
+      "pattern": {
+        "structure": ["INTRO_ATMOSPHERE", "VERSE_STORY", "HOOK_MELODIC", "VERSE_ESCALATION"],
+        "bpm_range": [140, 150],
+        "key": "F_minor",
+        "energy_curve": "variable",
+        "emotional_arc": "reflection_to_urgency"
+      },
+      "linguistic_markers": {
+        "slang_density": 0.85,
+        "regional_markers": ["chicago_drill", "south_side"],
+        "emotional_cues": ["loss", "memory", "streets"],
+        "narrative_mode": "autobiographical"
+      },
+      "musical_markers": {
+        "primary_instrument": "synth_pad",
+        "drum_pattern": "drill_kick_pattern",
+        "hi_hat_speed": "variable",
+        "808_presence": "dominant",
+        "melody_complexity": "medium"
+      },
+      "genetic_expression": {
+        "dominant_traits": ["THEMATIC_DEPTH", "CULTURAL_DEPTH", "VOCAL_PRESENCE"],
+        "recessive_traits": ["WORDPLAY", "COLLAB_CHEMISTRY"],
+        "expression_threshold": 0.70
+      }
+    },
+    {
+      "script_id": "es_003",
+      "name": "Loyalty Loop",
+      "artists": ["Tay B", "Lil Durk"],
+      "entropy_score": 0.91,
+      "pattern": {
+        "structure": ["VERSE_SETUP", "HOOK_THESIS", "VERSE_CONFLICT", "OUTRO_UNRESOLVED"],
+        "bpm_range": [120, 130],
+        "key": "G_minor",
+        "energy_curve": "sustained_tension",
+        "emotional_arc": "trust_to_betrayal"
+      },
+      "linguistic_markers": {
+        "slang_density": 0.68,
+        "regional_markers": ["loyalty_culture", "street_code"],
+        "emotional_cues": ["trust", "betrayal", "real_vs_fake"],
+        "narrative_mode": "dialogic"
+      },
+      "musical_markers": {
+        "primary_instrument": "piano",
+        "drum_pattern": "half_time_feel",
+        "hi_hat_speed": "moderate",
+        "808_presence": "pulsing",
+        "melody_complexity": "very_high"
+      },
+      "genetic_expression": {
+        "dominant_traits": ["STORYTELLING", "EMOTIONAL_RANGE", "DELIVERY"],
+        "recessive_traits": ["BEAT_SELECTION", "AD_LIB_STYLE"],
+        "expression_threshold": 0.75
+      }
+    },
+    {
+      "script_id": "es_004",
+      "name": "Piano Anchor V1",
+      "artists": ["YBNBA"],
+      "entropy_score": 0.65,
+      "pattern": {
+        "structure": ["INTRO_PIANO", "VERSE_MINIMAL", "HOOK_EXPANDED", "OUTRO_FADE"],
+        "bpm_range": [128, 132],
+        "key": "C_minor",
+        "energy_curve": "smooth",
+        "emotional_arc": "contemplation"
+      },
+      "linguistic_markers": {
+        "slang_density": 0.45,
+        "regional_markers": ["melodic_universal"],
+        "emotional_cues": ["introspection", "growth"],
+        "narrative_mode": "observational"
+      },
+      "musical_markers": {
+        "primary_instrument": "grand_piano",
+        "drum_pattern": "minimal_trap",
+        "hi_hat_speed": "slow",
+        "808_presence": "subtle",
+        "melody_complexity": "very_high"
+      },
+      "genetic_expression": {
+        "dominant_traits": ["MELODIC_SENSE", "BREATH_CONTROL"],
+        "recessive_traits": ["RHYME_COMPLEXITY", "PUNCHLINE_DENSITY"],
+        "expression_threshold": 0.60
+      }
+    },
+    {
+      "script_id": "es_005",
+      "name": "HiveMind Consensus",
+      "artists": ["Amalgamated"],
+      "entropy_score": 0.88,
+      "pattern": {
+        "structure": ["INTRO_CHAOS", "VERSE_BLEND", "HOOK_SYNTHESIS", "OUTRO_EVOLUTION"],
+        "bpm_range": [130, 145],
+        "key": "variable",
+        "energy_curve": "unpredictable",
+        "emotional_arc": "conflict_to_resolution"
+      },
+      "linguistic_markers": {
+        "slang_density": 0.78,
+        "regional_markers": ["multi_regional"],
+        "emotional_cues": ["synthesis", "evolution", "consensus"],
+        "narrative_mode": "collective"
+      },
+      "musical_markers": {
+        "primary_instrument": "mixed_synth",
+        "drum_pattern": "hybrid",
+        "hi_hat_speed": "variable",
+        "808_presence": "dynamic",
+        "melody_complexity": "extreme"
+      },
+      "genetic_expression": {
+        "dominant_traits": ["FLOW_COMPLEXITY", "WORDPLAY", "CULTURAL_ENTROPY"],
+        "recessive_traits": ["STORYTELLING"],
+        "expression_threshold": 0.80
+      }
+    }
+  ]
+}

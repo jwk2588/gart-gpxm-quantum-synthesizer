@@ -1,0 +1,113 @@
+{
+  "mined_data_version": "3.0.0",
+  "mined_at": "2025-01-15T00:00:00Z",
+  "source": "soundcloud_simulated",
+  "tracks": [
+    {
+      "track_id": "sc_001",
+      "title": "Melodic Survival Freestyle",
+      "artist": "Tay B",
+      "duration_ms": 184000,
+      "bpm": 132,
+      "key": "C_minor",
+      "genre_tags": ["melodic_trap", "emotional_rap", "piano_rap"],
+      "engagement": {
+        "plays": 1250000,
+        "likes": 89000,
+        "reposts": 12000,
+        "comments": 3400
+      },
+      "audio_features": {
+        "energy": 0.72,
+        "danceability": 0.68,
+        "acousticness": 0.45,
+        "instrumentalness": 0.02,
+        "liveness": 0.35,
+        "valence": 0.55,
+        "speechiness": 0.28,
+        "loudness_db": -8.5
+      },
+      "lyrical_features": {
+        "word_count": 450,
+        "unique_words": 180,
+        "rhyme_density": 0.75,
+        "avg_line_length": 8.2,
+        "repetition_score": 0.15
+      }
+    },
+    {
+      "track_id": "sc_002",
+      "title": "Street Narrative",
+      "artist": "Lil Durk",
+      "duration_ms": 210000,
+      "bpm": 145,
+      "key": "F_minor",
+      "genre_tags": ["chicago_drill", "melodic_drill", "street_rap"],
+      "engagement": {
+        "plays": 3400000,
+        "likes": 245000,
+        "reposts": 38000,
+        "comments": 8900
+      },
+      "audio_features": {
+        "energy": 0.78,
+        "danceability": 0.72,
+        "acousticness": 0.22,
+        "instrumentalness": 0.01,
+        "liveness": 0.42,
+        "valence": 0.48,
+        "speechiness": 0.32,
+        "loudness_db": -7.2
+      },
+      "lyrical_features": {
+        "word_count": 520,
+        "unique_words": 210,
+        "rhyme_density": 0.82,
+        "avg_line_length": 9.1,
+        "repetition_score": 0.12
+      }
+    },
+    {
+      "track_id": "sc_003",
+      "title": "Loyalty Loop (Unreleased)",
+      "artist": "Tay B x Lil Durk",
+      "duration_ms": 195000,
+      "bpm": 128,
+      "key": "G_minor",
+      "genre_tags": ["collab", "melodic_drill", "emotional"],
+      "engagement": {
+        "plays": 890000,
+        "likes": 67000,
+        "reposts": 15000,
+        "comments": 5600
+      },
+      "audio_features": {
+        "energy": 0.70,
+        "danceability": 0.65,
+        "acousticness": 0.38,
+        "instrumentalness": 0.03,
+        "liveness": 0.38,
+        "valence": 0.42,
+        "speechiness": 0.30,
+        "loudness_db": -9.0
+      },
+      "lyrical_features": {
+        "word_count": 480,
+        "unique_words": 195,
+        "rhyme_density": 0.79,
+        "avg_line_length": 8.5,
+        "repetition_score": 0.18
+      }
+    }
+  ],
+  "aggregate_stats": {
+    "total_tracks": 3,
+    "avg_bpm": 135.0,
+    "avg_duration_ms": 196333,
+    "total_plays": 5540000,
+    "total_likes": 401000,
+    "dominant_genres": ["melodic_trap", "chicago_drill", "melodic_drill"],
+    "avg_energy": 0.73,
+    "avg_rhyme_density": 0.79
+  }
+}
