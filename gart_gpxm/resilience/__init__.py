@@ -1,1 +1,1 @@
-"""GART v3.0 + GPXM — resilience package."""
+"""Resilience — Adaptive recovery engine for GART v3.0."""

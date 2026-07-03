@@ -1,1 +1,1 @@
-"""GART v3.0 + GPXM — tournament package."""
+"""Tournament — Tournament engine for GART v3.0."""

@@ -1,1 +1,1 @@
-"""GART v3.0 + GPXM — cross_platform package."""
+"""Cross Platform — Multi-platform adapter for GART v3.0."""

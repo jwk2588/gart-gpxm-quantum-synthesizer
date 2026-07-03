@@ -1,1 +1,1 @@
-"""GART v3.0 + GPXM — stash_box package."""
+"""Stash Box — Code reconstruction system for GART v3.0."""

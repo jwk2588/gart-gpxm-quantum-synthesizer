@@ -1,14 +1,16 @@
 """
-Cross-Platform Content Adapter — GART v3.0.
+Cross-Platform Adapter — Multi-Platform Bridge for GART v3.0.
 
-Adapts generated content for distribution across multiple platforms:
-    - LinkedIn: Professional, insightful, long-form
-    - Twitter/X: Punchy, conversational, thread-friendly
-    - GitHub README: Technical, documented, code-focused
-    - WeChat: Concise, mobile-optimized
-    - Zhihu: Educational, analytical, reference-rich
+Provides platform abstraction for running GART across different
+environments: local, cloud, containerized, and edge.
 
-Uses the Strategy pattern for platform-specific transformers.
+Components:
+    - PlatformAdapter: Main platform abstraction
+    - LocalAdapter: Local execution adapter
+    - CloudAdapter: Cloud execution adapter
+    - ContainerAdapter: Container execution adapter
+    - EdgeAdapter: Edge device adapter
+    - ResourceMonitor: Platform resource monitoring
 
 Author: GART Architecture Team
 Version: 3.0.0
@@ -17,6 +19,9 @@ Version: 3.0.0
 from __future__ import annotations
 
 import logging
+import os
+import platform as sys_platform
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -26,621 +31,482 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Platform enum
+# Enums
 # ---------------------------------------------------------------------------
 
 
-class Platform(Enum):
-    """Supported content distribution platforms."""
+class PlatformType(Enum):
+    """Supported platform types."""
 
-    LINKEDIN = "linkedin"
-    TWITTER = "twitter"
-    GITHUB = "github"
-    WECHAT = "wechat"
-    ZHIHU = "zhihu"
-
-
-# ---------------------------------------------------------------------------
-# ContentTransformer (Strategy pattern)
-# ---------------------------------------------------------------------------
+    LOCAL = "local"
+    CLOUD = "cloud"
+    CONTAINER = "container"
+    EDGE = "edge"
+    HYBRID = "hybrid"
 
 
-class ContentTransformer(ABC):
-    """Abstract base class for platform content transformers.
+class ResourceType(Enum):
+    """Types of compute resources."""
 
-    Implements the Strategy pattern — each platform defines its own
-    transformation rules for adapting content to its audience.
-    """
-
-    def __init__(self, platform: Platform) -> None:
-        self.platform = platform
-
-    @abstractmethod
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for this platform.
-
-        Args:
-            content: Raw content to transform.
-            metadata: Optional content metadata.
-
-        Returns:
-            Platform-formatted content.
-        """
-        ...
-
-    @abstractmethod
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate content meets platform requirements.
-
-        Args:
-            content: Content to validate.
-
-        Returns:
-            (is_valid, list_of_issues).
-        """
-        ...
-
-    @abstractmethod
-    def get_constraints(self) -> Dict[str, Any]:
-        """Get platform content constraints.
-
-        Returns:
-            Dictionary with constraint parameters.
-        """
-        ...
+    CPU = "cpu"
+    GPU = "gpu"
+    MEMORY = "memory"
+    STORAGE = "storage"
+    NETWORK = "network"
 
 
 # ---------------------------------------------------------------------------
-# LinkedInTransformer
+# Data Structures
 # ---------------------------------------------------------------------------
 
 
-class LinkedInTransformer(ContentTransformer):
-    """LinkedIn content transformer.
-
-    Style: Professional, insightful, long-form
-    Constraints: 3000 chars max, professional tone
-    """
-
-    MAX_LENGTH: int = 3000
-
-    def __init__(self) -> None:
-        super().__init__(Platform.LINKEDIN)
-
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for LinkedIn.
-
-        Adds professional framing, hashtags, and call-to-action.
-
-        Args:
-            content: Raw content.
-            metadata: Optional metadata.
-
-        Returns:
-            LinkedIn-formatted content.
-        """
-        lines = [
-            content,
-            "",
-            "---",
-            "",
-            "What are your thoughts on this approach? Share your insights below. 👇",
-            "",
-            "#AIMusic #GeneticPersona #MusicTech #Innovation",
-        ]
-        result = "\n".join(lines)
-
-        # Truncate if needed
-        if len(result) > self.MAX_LENGTH:
-            result = result[:self.MAX_LENGTH - 3] + "..."
-
-        return result
-
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate LinkedIn content.
-
-        Args:
-            content: Content to check.
-
-        Returns:
-            Validation result.
-        """
-        issues: List[str] = []
-        if len(content) > self.MAX_LENGTH:
-            issues.append(f"Content exceeds {self.MAX_LENGTH} characters")
-        return (len(issues) == 0, issues)
-
-    def get_constraints(self) -> Dict[str, Any]:
-        return {
-            "max_length": self.MAX_LENGTH,
-            "tone": "professional",
-            "hashtags": True,
-            "cta": True,
-        }
-
-
-# ---------------------------------------------------------------------------
-# TwitterTransformer
-# ---------------------------------------------------------------------------
-
-
-class TwitterTransformer(ContentTransformer):
-    """Twitter/X content transformer.
-
-    Style: Punchy, conversational, thread-friendly
-    Constraints: 280 chars per tweet, thread support
-    """
-
-    MAX_TWEET_LENGTH: int = 280
-
-    def __init__(self) -> None:
-        super().__init__(Platform.TWITTER)
-
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for Twitter.
-
-        Breaks content into tweet-sized chunks for threading.
-
-        Args:
-            content: Raw content.
-            metadata: Optional metadata.
-
-        Returns:
-            Twitter-formatted content (thread if needed).
-        """
-        sentences = content.replace("\n", " ").split(". ")
-        tweets: List[str] = []
-        current_tweet = ""
-
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            if not sentence.endswith("."):
-                sentence += "."
-
-            test_tweet = current_tweet + " " + sentence if current_tweet else sentence
-            if len(test_tweet) <= self.MAX_TWEET_LENGTH:
-                current_tweet = test_tweet
-            else:
-                if current_tweet:
-                    tweets.append(current_tweet.strip())
-                current_tweet = sentence
-
-        if current_tweet:
-            tweets.append(current_tweet.strip())
-
-        # Format as thread
-        if len(tweets) <= 1:
-            return tweets[0] if tweets else content[:self.MAX_TWEET_LENGTH]
-
-        lines: List[str] = []
-        for i, tweet in enumerate(tweets):
-            lines.append(f"({i+1}/{len(tweets)}) {tweet}")
-        return "\n\n".join(lines)
-
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate Twitter content.
-
-        Args:
-            content: Content to check.
-
-        Returns:
-            Validation result.
-        """
-        issues: List[str] = []
-        tweets = content.split("\n\n")
-        for i, tweet in enumerate(tweets):
-            # Remove thread marker
-            clean = tweet.split(" ", 1)[1] if tweet.startswith("(") and ")" in tweet[:10] else tweet
-            if len(clean) > self.MAX_TWEET_LENGTH:
-                issues.append(f"Tweet {i+1} exceeds {self.MAX_TWEET_LENGTH} chars")
-        return (len(issues) == 0, issues)
-
-    def get_constraints(self) -> Dict[str, Any]:
-        return {
-            "max_tweet_length": self.MAX_TWEET_LENGTH,
-            "tone": "conversational",
-            "threads": True,
-        }
-
-
-# ---------------------------------------------------------------------------
-# GitHubReadmeTransformer
-# ---------------------------------------------------------------------------
-
-
-class GitHubReadmeTransformer(ContentTransformer):
-    """GitHub README content transformer.
-
-    Style: Technical, documented, code-focused
-    Constraints: Markdown format, code blocks, badges
-    """
-
-    def __init__(self) -> None:
-        super().__init__(Platform.GITHUB)
-
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for GitHub README.
-
-        Adds markdown formatting, code blocks, and documentation structure.
-
-        Args:
-            content: Raw content.
-            metadata: Optional metadata with version, badges, etc.
-
-        Returns:
-            GitHub-formatted markdown.
-        """
-        meta = metadata or {}
-        version = meta.get("version", "3.0.0")
-        title = meta.get("title", "GART + GPXM")
-
-        lines = [
-            f"# {title}",
-            "",
-            f"![Version](https://img.shields.io/badge/version-{version}-blue)",
-            "![Python](https://img.shields.io/badge/python-3.10%2B-green)",
-            "![License](https://img.shields.io/badge/license-MIT-yellow)",
-            "",
-            "## Overview",
-            "",
-            content,
-            "",
-            "## Quick Start",
-            "",
-            "```python",
-            "from gart_gpxm import DualSwarmOrchestrator",
-            "",
-            "orchestrator = DualSwarmOrchestrator()",
-            "result = await orchestrator.coordinate_battle(artist_a, artist_b)",
-            "```",
-            "",
-            "## Architecture",
-            "",
-            "This project implements a dual-swarm AI music production system",
-            "combining genetic personas with expansive memory and quantum",
-            "linguistic synthesis.",
-            "",
-            "## Documentation",
-            "",
-            "See the `docs/` directory for full documentation.",
-        ]
-
-        return "\n".join(lines)
-
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate GitHub README content.
-
-        Args:
-            content: Content to check.
-
-        Returns:
-            Validation result.
-        """
-        issues: List[str] = []
-        if "# " not in content:
-            issues.append("Missing H1 heading")
-        if "```" not in content:
-            issues.append("Missing code block examples")
-        return (len(issues) == 0, issues)
-
-    def get_constraints(self) -> Dict[str, Any]:
-        return {
-            "format": "markdown",
-            "tone": "technical",
-            "code_examples": True,
-        }
-
-
-# ---------------------------------------------------------------------------
-# WeChatTransformer
-# ---------------------------------------------------------------------------
-
-
-class WeChatTransformer(ContentTransformer):
-    """WeChat content transformer.
-
-    Style: Concise, mobile-optimized, emoji-friendly
-    Constraints: Mobile-friendly length
-    """
-
-    def __init__(self) -> None:
-        super().__init__(Platform.WECHAT)
-
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for WeChat.
-
-        Shortens and simplifies for mobile reading.
-
-        Args:
-            content: Raw content.
-            metadata: Optional metadata.
-
-        Returns:
-            WeChat-formatted content.
-        """
-        # Simplify to key points
-        lines = content.split("\n")
-        key_lines = [l for l in lines if l.strip() and not l.startswith("#")]
-
-        # Take first few meaningful lines
-        summary = key_lines[:10] if len(key_lines) > 10 else key_lines
-
-        result = "\n".join(summary)
-
-        # Add WeChat-style ending
-        result += "\n\n---\n了解更多，请关注我们的公众号"
-
-        return result
-
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate WeChat content.
-
-        Args:
-            content: Content to check.
-
-        Returns:
-            Validation result.
-        """
-        issues: List[str] = []
-        if len(content) > 2000:
-            issues.append("Content may be too long for mobile")
-        return (len(issues) == 0, issues)
-
-    def get_constraints(self) -> Dict[str, Any]:
-        return {
-            "tone": "concise",
-            "mobile_optimized": True,
-            "max_length": 2000,
-        }
-
-
-# ---------------------------------------------------------------------------
-# ZhihuTransformer
-# ---------------------------------------------------------------------------
-
-
-class ZhihuTransformer(ContentTransformer):
-    """Zhihu content transformer.
-
-    Style: Educational, analytical, reference-rich
-    Constraints: Long-form, academic tone
-    """
-
-    def __init__(self) -> None:
-        super().__init__(Platform.ZHIHU)
-
-    def transform(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """Transform content for Zhihu.
-
-        Adds analytical framing and reference structure.
-
-        Args:
-            content: Raw content.
-            metadata: Optional metadata.
-
-        Returns:
-            Zhihu-formatted content.
-        """
-        lines = [
-            "## 引言",
-            "",
-            content,
-            "",
-            "## 技术分析",
-            "",
-            "本文涉及的技术框架包括：",
-            "- 遗传人格建模 (Genetic Persona Modeling)",
-            "- 扩展记忆系统 (Expansive Memory Bank)",
-            "- 量子语言合成器 (Quantum Linguistic Synthesizer)",
-            "- 对偶群体协调 (Dual-Swarm Orchestration)",
-            "",
-            "## 参考文献",
-            "",
-            "1. GART v3.0 Architecture Specification",
-            "2. GPXM Pipeline Design Document",
-            "3. Entropic Scripting Framework Guide",
-            "",
-            "---",
-            "",
-            "欢迎在评论区讨论技术细节。",
-        ]
-
-        return "\n".join(lines)
-
-    def validate(self, content: str) -> Tuple[bool, List[str]]:
-        """Validate Zhihu content.
-
-        Args:
-            content: Content to check.
-
-        Returns:
-            Validation result.
-        """
-        issues: List[str] = []
-        if "##" not in content:
-            issues.append("Missing section headers")
-        return (len(issues) == 0, issues)
-
-    def get_constraints(self) -> Dict[str, Any]:
-        return {
-            "tone": "educational",
-            "format": "markdown",
-            "references": True,
-        }
-
-
-# ---------------------------------------------------------------------------
-# CrossPlatformAdapter
-# ---------------------------------------------------------------------------
-
-
-class CrossPlatformAdapter:
-    """Cross-Platform Content Adapter.
-
-    Adapts generated content for distribution across multiple platforms.
-    Uses the Strategy pattern for platform-specific transformers.
+@dataclass
+class ResourceSnapshot:
+    """Snapshot of system resources.
 
     Attributes:
-        transformers: Dict mapping Platform to ContentTransformer.
+        resource_type: Type of resource.
+        total: Total capacity.
+        used: Used amount.
+        available: Available amount.
+        unit: Unit of measurement.
+        timestamp: Snapshot time.
+    """
+
+    resource_type: ResourceType
+    total: float
+    used: float
+    available: float
+    unit: str
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def utilization(self) -> float:
+        """Calculate utilization percentage."""
+        if self.total == 0:
+            return 0.0
+        return self.used / self.total
+
+
+@dataclass
+class PlatformConfig:
+    """Configuration for a platform.
+
+    Attributes:
+        platform_type: Type of platform.
+        max_workers: Maximum parallel workers.
+        resource_limits: Resource limits.
+        env_vars: Environment variables.
+    """
+
+    platform_type: PlatformType
+    max_workers: int = 4
+    resource_limits: Dict[str, float] = field(default_factory=dict)
+    env_vars: Dict[str, str] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# PlatformAdapter (abstract base)
+# ---------------------------------------------------------------------------
+
+
+class PlatformAdapter(ABC):
+    """Abstract base for platform adapters.
+
+    Defines the interface that all platform adapters must implement.
+    """
+
+    def __init__(self, config: PlatformConfig) -> None:
+        self.config = config
+
+    @abstractmethod
+    def get_resources(self) -> Dict[ResourceType, ResourceSnapshot]:
+        """Get current resource snapshot.
+
+        Returns:
+            Dict of resource type -> snapshot.
+        """
+        ...
+
+    @abstractmethod
+    def execute(self, command: str, **kwargs: Any) -> Dict[str, Any]:
+        """Execute a command on the platform.
+
+        Args:
+            command: Command to execute.
+            **kwargs: Additional execution parameters.
+
+        Returns:
+            Execution result.
+        """
+        ...
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Check if platform is available.
+
+        Returns:
+            True if platform is ready.
+        """
+        ...
+
+    def get_type(self) -> PlatformType:
+        """Get platform type.
+
+        Returns:
+            Platform type.
+        """
+        return self.config.platform_type
+
+    def can_accommodate(self, requirements: Dict[str, float]) -> bool:
+        """Check if platform can accommodate requirements.
+
+        Args:
+            requirements: Resource requirements.
+
+        Returns:
+            True if requirements can be met.
+        """
+        resources = self.get_resources()
+        for key, required in requirements.items():
+            try:
+                rtype = ResourceType(key)
+                if rtype in resources:
+                    if resources[rtype].available < required:
+                        return False
+            except ValueError:
+                continue
+        return True
+
+
+# ---------------------------------------------------------------------------
+# LocalAdapter
+# ---------------------------------------------------------------------------
+
+
+class LocalAdapter(PlatformAdapter):
+    """Adapter for local execution environment."""
+
+    def __init__(self, config: Optional[PlatformConfig] = None) -> None:
+        super().__init__(config or PlatformConfig(PlatformType.LOCAL))
+
+    def get_resources(self) -> Dict[ResourceType, ResourceSnapshot]:
+        """Get local system resources."""
+        import psutil
+
+        # CPU
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        cpu_count = psutil.cpu_count()
+
+        # Memory
+        mem = psutil.virtual_memory()
+
+        # Disk
+        disk = psutil.disk_usage("/")
+
+        return {
+            ResourceType.CPU: ResourceSnapshot(
+                resource_type=ResourceType.CPU,
+                total=float(cpu_count * 100),
+                used=float(cpu_percent * cpu_count),
+                available=float((100 - cpu_percent) * cpu_count),
+                unit="percent",
+            ),
+            ResourceType.MEMORY: ResourceSnapshot(
+                resource_type=ResourceType.MEMORY,
+                total=mem.total / (1024**3),
+                used=mem.used / (1024**3),
+                available=mem.available / (1024**3),
+                unit="GB",
+            ),
+            ResourceType.STORAGE: ResourceSnapshot(
+                resource_type=ResourceType.STORAGE,
+                total=disk.total / (1024**3),
+                used=disk.used / (1024**3),
+                available=disk.free / (1024**3),
+                unit="GB",
+            ),
+        }
+
+    def execute(self, command: str, **kwargs: Any) -> Dict[str, Any]:
+        """Execute a local command."""
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=kwargs.get("timeout", 60),
+            )
+            return {
+                "success": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "Timeout"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def is_available(self) -> bool:
+        """Local platform is always available."""
+        return True
+
+
+# ---------------------------------------------------------------------------
+# CloudAdapter
+# ---------------------------------------------------------------------------
+
+
+class CloudAdapter(PlatformAdapter):
+    """Adapter for cloud execution environment."""
+
+    def __init__(self, config: Optional[PlatformConfig] = None) -> None:
+        super().__init__(config or PlatformConfig(PlatformType.CLOUD))
+        self._connected = False
+
+    def connect(self) -> bool:
+        """Connect to cloud provider.
+
+        Returns:
+            True if connected.
+        """
+        # Placeholder for cloud connection
+        self._connected = True
+        return True
+
+    def get_resources(self) -> Dict[ResourceType, ResourceSnapshot]:
+        """Get cloud resources."""
+        # Placeholder
+        return {
+            ResourceType.CPU: ResourceSnapshot(
+                resource_type=ResourceType.CPU,
+                total=1600.0,
+                used=400.0,
+                available=1200.0,
+                unit="vCPU",
+            ),
+            ResourceType.MEMORY: ResourceSnapshot(
+                resource_type=ResourceType.MEMORY,
+                total=6400.0,
+                used=1200.0,
+                available=5200.0,
+                unit="GB",
+            ),
+        }
+
+    def execute(self, command: str, **kwargs: Any) -> Dict[str, Any]:
+        """Execute on cloud."""
+        if not self._connected:
+            self.connect()
+        return {"success": True, "platform": "cloud", "command": command}
+
+    def is_available(self) -> bool:
+        """Check cloud availability."""
+        return self._connected
+
+
+# ---------------------------------------------------------------------------
+# ContainerAdapter
+# ---------------------------------------------------------------------------
+
+
+class ContainerAdapter(PlatformAdapter):
+    """Adapter for container execution environment."""
+
+    def __init__(self, config: Optional[PlatformConfig] = None) -> None:
+        super().__init__(config or PlatformConfig(PlatformType.CONTAINER))
+        self._in_container = self._detect_container()
+
+    def _detect_container(self) -> bool:
+        """Detect if running inside a container.
+
+        Returns:
+            True if in container.
+        """
+        # Check for cgroup indicators
+        cgroup_path = "/proc/self/cgroup"
+        if os.path.exists(cgroup_path):
+            with open(cgroup_path) as f:
+                content = f.read()
+                if "docker" in content or "kubepods" in content:
+                    return True
+        return False
+
+    def get_resources(self) -> Dict[ResourceType, ResourceSnapshot]:
+        """Get container resources."""
+        if not self._in_container:
+            return LocalAdapter().get_resources()
+
+        # Read cgroup limits
+        try:
+            with open("/sys/fs/cgroup/memory.limit_in_bytes") as f:
+                mem_limit = int(f.read().strip())
+            with open("/sys/fs/cgroup/memory.usage_in_bytes") as f:
+                mem_used = int(f.read().strip())
+
+            return {
+                ResourceType.MEMORY: ResourceSnapshot(
+                    resource_type=ResourceType.MEMORY,
+                    total=mem_limit / (1024**3),
+                    used=mem_used / (1024**3),
+                    available=(mem_limit - mem_used) / (1024**3),
+                    unit="GB",
+                ),
+            }
+        except Exception:
+            return {}
+
+    def execute(self, command: str, **kwargs: Any) -> Dict[str, Any]:
+        """Execute in container."""
+        return {"success": True, "platform": "container", "command": command}
+
+    def is_available(self) -> bool:
+        """Check container availability."""
+        return True
+
+
+# ---------------------------------------------------------------------------
+# ResourceMonitor
+# ---------------------------------------------------------------------------
+
+
+class ResourceMonitor:
+    """Monitor resources across platforms.
+
+    Tracks resource utilization and triggers alerts
+    when thresholds are exceeded.
     """
 
     def __init__(self) -> None:
-        self.transformers: Dict[Platform, ContentTransformer] = {
-            Platform.LINKEDIN: LinkedInTransformer(),
-            Platform.TWITTER: TwitterTransformer(),
-            Platform.GITHUB: GitHubReadmeTransformer(),
-            Platform.WECHAT: WeChatTransformer(),
-            Platform.ZHIHU: ZhihuTransformer(),
+        self._adapters: List[PlatformAdapter] = []
+        self._thresholds: Dict[str, float] = {
+            "cpu": 0.8,
+            "memory": 0.85,
+            "storage": 0.9,
+        }
+        self._alerts: List[Dict[str, Any]] = []
+
+    def register_adapter(self, adapter: PlatformAdapter) -> None:
+        """Register a platform adapter.
+
+        Args:
+            adapter: Adapter to monitor.
+        """
+        self._adapters.append(adapter)
+
+    def check_all(self) -> Dict[str, Any]:
+        """Check resources on all platforms.
+
+        Returns:
+            Status report.
+        """
+        report = {
+            "platforms": [],
+            "alerts": [],
         }
 
-    def distribute(
-        self,
-        content: str,
-        platforms: List[Platform],
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[Platform, str]:
-        """Transform content for multiple platforms.
+        for adapter in self._adapters:
+            if not adapter.is_available():
+                continue
 
-        Args:
-            content: Raw content to distribute.
-            platforms: List of target platforms.
-            metadata: Optional content metadata.
+            resources = adapter.get_resources()
+            platform_report = {
+                "type": adapter.get_type().value,
+                "resources": {},
+            }
 
-        Returns:
-            Dict mapping Platform to formatted content.
+            for rtype, snapshot in resources.items():
+                platform_report["resources"][rtype.value] = {
+                    "total": snapshot.total,
+                    "used": snapshot.used,
+                    "available": snapshot.available,
+                    "utilization": snapshot.utilization,
+                    "unit": snapshot.unit,
+                }
 
-        Raises:
-            ValueError: If an unsupported platform is requested.
-        """
-        results: Dict[Platform, str] = {}
+                # Check thresholds
+                threshold = self._thresholds.get(rtype.value, 0.9)
+                if snapshot.utilization > threshold:
+                    alert = {
+                        "platform": adapter.get_type().value,
+                        "resource": rtype.value,
+                        "utilization": snapshot.utilization,
+                        "threshold": threshold,
+                    }
+                    self._alerts.append(alert)
+                    report["alerts"].append(alert)
 
-        for platform in platforms:
-            transformer = self.transformers.get(platform)
-            if transformer is None:
-                raise ValueError(f"Unsupported platform: {platform}")
+            report["platforms"].append(platform_report)
 
-            transformed = transformer.transform(content, metadata)
-            results[platform] = transformed
-            logger.info("Distributed to %s (%d chars)", platform.value, len(transformed))
+        return report
 
-        return results
-
-    def adapt_tone(self, content: str, platform: Platform) -> str:
-        """Adapt content tone for a specific platform.
-
-        Args:
-            content: Content to adapt.
-            platform: Target platform.
-
-        Returns:
-            Tone-adapted content.
-        """
-        transformer = self.transformers.get(platform)
-        if transformer is None:
-            return content
-
-        constraints = transformer.get_constraints()
-        tone = constraints.get("tone", "neutral")
-
-        tone_prefixes: Dict[str, str] = {
-            "professional": "",
-            "conversational": "",
-            "technical": "",
-            "concise": "",
-            "educational": "",
-        }
-
-        # Transform
-        return transformer.transform(content)
-
-    def validate_all(
-        self,
-        content: str,
-        platforms: List[Platform],
-    ) -> Dict[Platform, Tuple[bool, List[str]]]:
-        """Validate content for all specified platforms.
-
-        Args:
-            content: Content to validate.
-            platforms: Platforms to validate against.
+    def get_alerts(self) -> List[Dict[str, Any]]:
+        """Get pending alerts.
 
         Returns:
-            Dict mapping Platform to validation results.
+            List of alerts.
         """
-        results: Dict[Platform, Tuple[bool, List[str]]] = {}
+        return list(self._alerts)
 
-        for platform in platforms:
-            transformer = self.transformers.get(platform)
-            if transformer:
-                results[platform] = transformer.validate(content)
+    def clear_alerts(self) -> None:
+        """Clear all alerts."""
+        self._alerts.clear()
 
-        return results
 
-    def add_transformer(
-        self,
-        platform: Platform,
-        transformer: ContentTransformer,
-    ) -> None:
-        """Register a custom platform transformer.
+# ---------------------------------------------------------------------------
+# PlatformFactory
+# ---------------------------------------------------------------------------
+
+
+class PlatformFactory:
+    """Factory for creating platform adapters."""
+
+    @staticmethod
+    def create(platform_type: PlatformType, **kwargs: Any) -> PlatformAdapter:
+        """Create a platform adapter.
 
         Args:
-            platform: Platform identifier.
-            transformer: Transformer instance.
-        """
-        self.transformers[platform] = transformer
-        logger.info("Registered transformer for %s", platform.value)
-
-    def get_platform_constraints(self, platform: Platform) -> Dict[str, Any]:
-        """Get constraints for a platform.
-
-        Args:
-            platform: Platform to query.
+            platform_type: Type of platform.
+            **kwargs: Additional configuration.
 
         Returns:
-            Constraints dictionary.
+            Platform adapter.
         """
-        transformer = self.transformers.get(platform)
-        if transformer:
-            return transformer.get_constraints()
-        return {}
+        config = PlatformConfig(
+            platform_type=platform_type,
+            **{k: v for k, v in kwargs.items() if k in ["max_workers", "resource_limits", "env_vars"]}
+        )
 
-    def get_summary(self, distribution: Dict[Platform, str]) -> str:
-        """Generate summary of distribution results.
+        if platform_type == PlatformType.LOCAL:
+            return LocalAdapter(config)
+        elif platform_type == PlatformType.CLOUD:
+            return CloudAdapter(config)
+        elif platform_type == PlatformType.CONTAINER:
+            return ContainerAdapter(config)
+        else:
+            return LocalAdapter(config)
 
-        Args:
-            distribution: Results from distribute().
+    @staticmethod
+    def detect() -> PlatformType:
+        """Auto-detect the current platform.
 
         Returns:
-            Summary string.
+            Detected platform type.
         """
-        lines = ["Cross-Platform Distribution Summary:", ""]
-        for platform, content in distribution.items():
-            lines.append(f"  {platform.value}: {len(content)} characters")
-        lines.append(f"\n  Total platforms: {len(distribution)}")
-        return "\n".join(lines)
+        # Check for container
+        cgroup_path = "/proc/self/cgroup"
+        if os.path.exists(cgroup_path):
+            with open(cgroup_path) as f:
+                content = f.read()
+                if "docker" in content or "kubepods" in content:
+                    return PlatformType.CONTAINER
 
+        # Check for cloud indicators
+        if os.environ.get("CLOUD_PROVIDER"):
+            return PlatformType.CLOUD
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Cross-Platform Adapter loaded successfully.")
-
-    adapter = CrossPlatformAdapter()
-
-    sample_content = (
-        "GART v3.0 + GPXM is a dual-swarm AI music production system "
-        "that uses genetic personas with expansive memory to create "
-        "authentic-sounding artist collaborations. The system combines "
-        "PyTorch neural architectures with entropic scripting for "
-        "style-accurate music generation."
-    )
-
-    platforms = [Platform.TWITTER, Platform.LINKEDIN, Platform.GITHUB]
-    results = adapter.distribute(sample_content, platforms)
-
-    for platform, content in results.items():
-        print(f"\n--- {platform.value.upper()} ---")
-        print(content[:200] + "...")
-
-    print(f"\n{adapter.get_summary(results)}")
+        return PlatformType.LOCAL
