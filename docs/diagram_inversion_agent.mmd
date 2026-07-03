@@ -1,0 +1,386 @@
+```mermaid
+%% GART v3.0 - Diagram-to-Code Inversion Agent Architecture
+%% INVERSION MODE: Specifies the code generation pipeline
+%% @author: Architecture Designer (INVERSION MODE)
+%% @version: 3.0.0
+
+classDiagram
+    direction TB
+
+    %% ============================================================
+    %% INVERSION AGENT CONTROLLER
+    %% ============================================================
+    class DiagramToCodeInversionAgent {
+        <<module>>
+        +mode: InversionMode
+        +mermaid_parser: MermaidASTParser
+        +code_generator: PythonCodeGenerator
+        +relationship_mapper: RelationshipMapper
+        +template_engine: TemplateEngine
+        +output_formatter: OutputFormatter
+        +__init__(mode: InversionMode, config: InversionConfig) None
+        +generate_classes(mermaid_source: str) List[PythonClass]
+        +generate_methods(node: ASTNode) List[PythonMethod]
+        +map_inheritance(edges: List[Edge]) Dict[str, str]
+        +map_composition(edges: List[Edge]) Dict[str, List[str]]
+        +parse_mermaid(mermaid_source: str) MermaidAST
+        +emit_python(ast: MermaidAST) str
+        +validate_output(python_code: str) ValidationResult
+        +generate_from_file(filepath: str) str
+        +generate_from_directory(dirpath: str) Dict[str, str]
+        +compare_modes(source: str) ComparisonReport
+    }
+
+    class InversionMode {
+        <<enumeration>>
+        SINGLE
+        HIVE_MIND
+        AGENT_SWARM
+    }
+
+    class InversionConfig {
+        <<dataclass>>
+        +output_style: str
+        +typing_style: str
+        +docstring_style: str
+        +indent_size: int
+        +line_length: int
+        +import_style: str
+    }
+
+    DiagramToCodeInversionAgent --> InversionMode : uses
+    DiagramToCodeInversionAgent --> InversionConfig : configured_by
+
+    %% ============================================================
+    %% SINGLE MODE PIPELINE
+    %% ============================================================
+    class SingleModePipeline {
+        +execute(agent: DiagramToCodeInversionAgent, source: str) str
+        +_parse(agent, source) MermaidAST
+        +_analyze(agent, ast) AnalysisResult
+        +_generate(agent, ast) str
+        +_validate(agent, code) ValidationResult
+    }
+
+    %% ============================================================
+    %% HIVE MIND MODE PIPELINE
+    %% ============================================================
+    class HiveMindPipeline {
+        +agents: List[DiagramToCodeInversionAgent>
+        +voting_engine: VotingEngine
+        +__init__(agent_count: int) None
+        +execute(agents, source: str) str
+        +_distribute_parsing(agents, source) List[MermaidAST]
+        +_collect_class_proposals(ast_list) List[ClassProposal]
+        +_vote_on_conflicts(proposals) ResolvedClasses
+        +_merge_resolved(resolved) str
+        +_validate_final(code) ValidationResult
+    }
+
+    class VotingEngine {
+        +voting_strategy: str
+        +__init__(strategy: str) None
+        +vote(proposals: List[ClassProposal>) ResolvedClasses
+        +_majority_vote(proposals) ResolvedClasses
+        +_weighted_vote(proposals, weights) ResolvedClasses
+        +_consensus_vote(proposals) ResolvedClasses
+    }
+
+    class ClassProposal {
+        +class_name: str
+        +proposed_by: str
+        +attributes: List[Attribute]
+        +methods: List[Method]
+        +confidence: float
+        +__init__() None
+    }
+
+    class ResolvedClasses {
+        +classes: List[PythonClass>
+        +conflict_log: List[Conflict]
+        +__init__() None
+        +add_resolved(cls: PythonClass, conflict: Conflict) None
+        +get_conflict_report() str
+    }
+
+    class Conflict {
+        +class_name: str
+        +conflicting_versions: List[ClassProposal>
+        +resolution: str
+        +winner: ClassProposal
+        +__init__() None
+    }
+
+    HiveMindPipeline *-- VotingEngine : "voting_engine"
+    HiveMindPipeline --> ClassProposal : "produces"
+    VotingEngine --> ResolvedClasses : "produces"
+    ResolvedClasses *-- Conflict : "conflict_log"
+
+    %% ============================================================
+    %% AGENT SWARM MODE PIPELINE
+    %% ============================================================
+    class AgentSwarmPipeline {
+        +agents: List[DiagramToCodeInversionAgent>
+        +coordinator: SwarmCoordinator
+        +__init__(agent_count: int) None
+        +execute(agents, sources: List[str>) Dict[str, str]
+        +_spawn_agents(count: int) List[DiagramToCodeInversionAgent>
+        +_assign_work(coordinator, agents, sources) WorkAssignments
+        +_collect_results(agents) Dict[str, str]
+        +_merge_results(results) str
+    }
+
+    class SwarmCoordinator {
+        +assignment_strategy: str
+        +__init__() None
+        +assign(agents: List[DiagramToCodeInversionAgent>, sources: List[str>) WorkAssignments
+        +_round_robin(agents, sources) WorkAssignments
+        +_work_stealing(agents, sources) WorkAssignments
+        +collect(agents) Dict[str, str]
+    }
+
+    class WorkAssignments {
+        +assignments: Dict[str, List[str>>
+        +__init__() None
+        +add(agent_id: str, sources: List[str>) None
+        +get_for(agent_id: str) List[str>
+        +is_balanced() bool
+    }
+
+    AgentSwarmPipeline *-- SwarmCoordinator : "coordinator"
+    SwarmCoordinator --> WorkAssignments : "produces"
+
+    %% ============================================================
+    %% PARSER COMPONENT
+    %% ============================================================
+    class MermaidASTParser {
+        <<module>>
+        +grammar: Grammar
+        +lexer: Lexer
+        +error_handler: ErrorHandler
+        +__init__() None
+        +parse(source: str) MermaidAST
+        +tokenize(source: str) List[Token>
+        +build_ast(tokens: List[Token>) MermaidAST
+        +_parse_class_definition(tokens) ClassNode
+        +_parse_method_signature(tokens) MethodNode
+        +_parse_relationship(tokens) Edge
+        +_parse_stereotype(tokens) str
+        +_parse_attributes(tokens) List[Attribute>
+        +handle_syntax_error(error: SyntaxError) None
+    }
+
+    class Grammar {
+        +rules: List[GrammarRule>
+        +start_symbol: str
+        +__init__() None
+        +parse(tokens: List<Token>) ParseTree
+        +_apply_rule(rule: GrammarRule, tokens) ParseResult
+    }
+
+    class Lexer {
+        +patterns: List[TokenPattern>
+        +__init__() None
+        +tokenize(source: str) List<Token>
+        +_match_pattern(pattern: TokenPattern, text: str) MatchResult
+    }
+
+    class MermaidAST {
+        +nodes: List<ASTNode>
+        +edges: List<Edge>
+        +metadata: Dict[str, Any>
+        +__init__() None
+        +add_node(node: ASTNode) None
+        +add_edge(edge: Edge) None
+        +get_class(name: str) ClassNode
+        +get_relationships(node: str) List<Edge>
+        +to_dict() Dict[str, Any]
+    }
+
+    class ASTNode {
+        <<abstract>>
+        +node_type: str
+        +node_id: str
+        +attributes: Dict[str, Any]
+        +line_number: int
+        +__init__() None
+    }
+
+    class ClassNode {
+        +class_name: str
+        +stereotype: str
+        +members: List<Member>
+        +methods: List<Method>
+        +base_classes: List[str>
+        +__init__() None
+    }
+
+    class MethodNode {
+        +method_name: str
+        +visibility: str
+        +parameters: List<Parameter>
+        +return_type: str
+        +is_abstract: bool
+        +is_static: bool
+        +is_classmethod: bool
+        +is_property: bool
+        +__init__() None
+    }
+
+    class Edge {
+        +source: str
+        +target: str
+        +edge_type: str
+        +label: str
+        +__init__() None
+    }
+
+    class Token {
+        +token_type: str
+        +value: str
+        +line: int
+        +column: int
+        +__init__() None
+    }
+
+    ASTNode <|-- ClassNode : extends
+    ASTNode <|-- MethodNode : extends
+
+    MermaidASTParser *-- Grammar : "grammar"
+    MermaidASTParser *-- Lexer : "lexer"
+    MermaidASTParser --> MermaidAST : "produces"
+    MermaidAST --> ASTNode : "contains"
+    MermaidAST --> Edge : "contains"
+    Lexer --> Token : "produces"
+
+    %% ============================================================
+    %% CODE GENERATOR COMPONENT
+    %% ============================================================
+    class PythonCodeGenerator {
+        <<module>>
+        +templates: Dict[str, Template>
+        +type_map: Dict[str, str>
+        +config: GeneratorConfig
+        +__init__(config: GeneratorConfig) None
+        +generate_class(class_def: ClassDefinition) str
+        +generate_method(method_def: MethodDefinition) str
+        +generate_imports(classes: List<ClassDefinition>) str
+        +generate_dataclass(class_def: ClassDefinition) str
+        +generate_abstract_class(class_def: ClassDefinition) str
+        +generate_enum(enum_def: EnumDefinition) str
+        +generate_property(prop_def: PropertyDefinition) str
+        +generate_docstring(content: str, style: str) str
+        +generate_type_hint(type_str: str) str
+        +apply_styling_conventions(code: str) str
+        +format_with_black(code: str) str
+    }
+
+    class GeneratorConfig {
+        <<dataclass>>
+        +output_style: str
+        +typing_style: str
+        +docstring_style: str
+        +indent_size: int
+        +line_length: int
+        +import_style: str
+        +use_dataclasses: bool
+        +use_pydantic: bool
+        +use_protocols: bool
+    }
+
+    class TemplateEngine {
+        +environment: Jinja2Environment
+        +__init__() None
+        +render(template_name: str, context: Dict) str
+        +register_template(name: str, template: str) None
+        +load_template_from_file(filepath: str) None
+    }
+
+    class TemplateRegistry {
+        +templates: Dict[str, Template>
+        +__init__() None
+        +register(name: str, template: Template) None
+        +get(name: str) Template
+        +list_available() List[str>
+    }
+
+    class OutputFormatter {
+        +formatters: List<Formatter>
+        +__init__() None
+        +format(code: str, format: str) str
+        +_format_with_black(code: str) str
+        +_format_with_autopep8(code: str) str
+        +_format_with_ruff(code: str) str
+    }
+
+    PythonCodeGenerator --> GeneratorConfig : configured_by
+    PythonCodeGenerator *-- TemplateEngine : "template_engine"
+    PythonCodeGenerator --> TemplateRegistry : uses
+    PythonCodeGenerator --> OutputFormatter : uses
+
+    %% ============================================================
+    %% RELATIONSHIP MAPPER COMPONENT
+    %% ============================================================
+    class RelationshipMapper {
+        <<module>>
+        +inheritance_map: Dict[str, str>
+        +composition_map: Dict[str, List[str>>
+        +association_map: Dict[str, List[str>>
+        +__init__() None
+        +map_relationships(ast: MermaidAST) RelationshipGraph
+        +resolve_dependencies() List[str>
+        +get_inheritance_chain(class_name: str) List[str>
+        +get_composition_tree(class_name: str) Tree
+        +get_associated_classes(class_name: str) List[str>
+        +detect_cycles() List[List[str>>
+        +topological_sort(classes: List[str>) List[str>
+    }
+
+    class RelationshipGraph {
+        +nodes: List[str>
+        +edges: List<RelationshipEdge>
+        +__init__() None
+        +add_edge(edge: RelationshipEdge) None
+        +get_parents(node: str) List[str>
+        +get_children(node: str) List[str>
+        +get_neighbors(node: str) List[str>
+        +has_cycles() bool
+    }
+
+    class RelationshipEdge {
+        +source: str
+        +target: str
+        +relationship_type: str
+        +cardinality: str
+        +__init__() None
+    }
+
+    RelationshipMapper --> RelationshipGraph : "produces"
+    RelationshipGraph *-- RelationshipEdge : "contains"
+
+    %% ============================================================
+    %% COMPOSITION
+    %% ============================================================
+    DiagramToCodeInversionAgent *-- MermaidASTParser : "mermaid_parser"
+    DiagramToCodeInversionAgent *-- PythonCodeGenerator : "code_generator"
+    DiagramToCodeInversionAgent *-- RelationshipMapper : "relationship_mapper"
+
+    %% ============================================================
+    %% MODE SELECTION
+    %% ============================================================
+    DiagramToCodeInversionAgent --> SingleModePipeline : "when SINGLE"
+    DiagramToCodeInversionAgent --> HiveMindPipeline : "when HIVE_MIND"
+    DiagramToCodeInversionAgent --> AgentSwarmPipeline : "when AGENT_SWARM"
+
+    %% ============================================================
+    %% CODE GEN NOTES
+    %% ============================================================
+    note for DiagramToCodeInversionAgent "CODEGEN-HINT: Strategy pattern for modes. Factory for pipeline selection."
+    note for MermaidASTParser "CODEGEN-HINT: Recursive descent parser. Error recovery with panic mode."
+    note for PythonCodeGenerator "CODEGEN-HINT: Jinja2 templates. Black formatter. Type stub generation."
+    note for RelationshipMapper "CODEGEN-HINT: Graph algorithms. NetworkX for complex analysis."
+    note for HiveMindPipeline "CODEGEN-HINT: Majority voting. Confidence scoring. Conflict resolution."
+    note for AgentSwarmPipeline "CODEGEN-HINT: Async workers. ProcessPoolExecutor. Work-stealing scheduler."
+
+    note "INVERSION MODE: This diagram itself is consumed by the agent to generate its own code."
+```

@@ -1,0 +1,191 @@
+```mermaid
+%% GART v3.0 - Dual-Swarm Architecture Detail
+%% INVERSION MODE: Specifies the internal communication topology
+%% @author: Architecture Designer (INVERSION MODE)
+%% @version: 3.0.0
+
+classDiagram
+    direction LR
+
+    %% ============================================================
+    %% SWARM ALPHA: Linguistic DAW
+    %% ============================================================
+    class LinguisticDAW {
+        <<module>>
+        +linguistic_engine: LinguisticEngine
+        +verse_constructor: VerseConstructor
+        +stem_generator: StemGenerator
+        +audio_pipeline: AudioPipeline
+        +__init__(config: DAWConfig) None
+        +compose_verse(persona: GeneticPersona, prompt: Prompt) CypherResult
+        +generate_stems(cypher: CypherResult) List[VerseStem]
+        +apply_sidechain(stems: List[VerseStem]) List[VerseStem]
+        +render_mix(stems: List[VerseStem]) AudioBuffer
+    }
+
+    class LinguisticEngine {
+        <<module>>
+        +lllm_core: LLLM_Architecture
+        +vocab_manager: VocabularyManager
+        +cadence_analyzer: CadenceAnalyzer
+        +__init__(lllm: LLLM_Architecture) None
+        +generate_lyrics(prompt: Prompt, persona: GeneticPersona) LyricResult
+        +analyze_cadence(lyrics: str) CadenceAnalysis
+        +inject_vernacular(lyrics: str, persona: GeneticPersona) str
+        +score_linguistic_quality(lyrics: str) float
+    }
+
+    class VerseConstructor {
+        <<module>>
+        +structure_templates: List[StructureTemplate]
+        +rhyme_engine: RhymeEngine
+        +meter_analyzer: MeterAnalyzer
+        +__init__() None
+        +construct_verse(lyrics: str, template: StructureTemplate) VerseResult
+        +apply_rhyme_scheme(verse: VerseResult, scheme: str) VerseResult
+        +optimize_meter(verse: VerseResult) VerseResult
+    }
+
+    class StemGenerator {
+        <<module>>
+        +synth_library: SynthLibrary
+        +sample_bank: SampleBank
+        +__init__() None
+        +generate_vocal_stem(lyrics: str, persona: GeneticPersona) VocalStem
+        +generate_beat_stem(pattern: str, bpm: int) BeatStem
+        +generate_ambient_stem(mood: str) AmbientStem
+        +layer_stems(stems: List[Stem]) MixedStem
+    }
+
+    %% ============================================================
+    %% SWARM OMEGA: Frankenstein Hive Mind
+    %% ============================================================
+    class FrankensteinHiveMind {
+        <<module>>
+        +pedigree_aggregator: PedigreeAggregator
+        +style_synthesizer: StyleSynthesizer
+        +entropy_injector: EntropyInjector
+        +mk_studio_env: MKStudioEnvironment
+        +__init__(config: HiveConfig) None
+        +amalgamate_opponent(target_persona: GeneticPersona) GeneticPersona
+        +synthesize_style(pedigree: List[GeneticPersona]) StylisticSignature
+        +inject_entropy(cypher: CypherResult, level: float) CypherResult
+        +generate_challenger_verse(opponent: GeneticPersona) CypherResult
+    }
+
+    class PedigreeAggregator {
+        <<module>>
+        +source_personas: List[GeneticPersona]
+        +weighting_strategy: WeightingStrategy
+        +__init__() None
+        +aggregate_traits(personas: List[GeneticPersona]) TraitVector
+        +blend_stylistic_signatures(signatures: List[StylisticSignature]) StylisticSignature
+        +compute_hybrid_fitness(parents: List[GeneticPersona]) float
+    }
+
+    class StyleSynthesizer {
+        <<module>>
+        +interpolation_mode: str
+        +__init__(mode: str) None
+        +synthesize(sources: List[StylisticSignature]) StylisticSignature
+        +interpolate(sig_a: StylisticSignature, sig_b: StylisticSignature, t: float) StylisticSignature
+        +morph(source: StylisticSignature, target: StylisticSignature) StylisticSignature
+    }
+
+    class EntropyInjector {
+        <<module>>
+        +injection_strategies: List[InjectionStrategy]
+        +__init__() None
+        +inject(cypher: CypherResult, entropy_level: float) CypherResult
+        +add_noise(tokens: List[Token], amount: float) List[Token]
+        +shuffle_rhythm(cypher: CypherResult) CypherResult
+        +crossover_lyrics(cypher_a: CypherResult, cypher_b: CypherResult) CypherResult
+    }
+
+    class MKStudioEnvironment {
+        <<module>>
+        +acoustic_profile: AcousticProfile
+        +equipment_chain: EquipmentChain
+        +__init__() None
+        +simulate_recording(vocal_stem: VocalStem) ProcessedStem
+        +apply_room_acoustics(stem: Stem) Stem
+        +apply_eq_chain(stem: Stem) Stem
+    }
+
+    %% ============================================================
+    %% LINGUISTIC SIDECHAIN: Communication Agent
+    %% ============================================================
+    class SidechainCompressor {
+        <<module>>
+        +threshold: float
+        +ratio: float
+        +attack_ms: float
+        +release_ms: float
+        +knee: float
+        +__init__(config: CompressorConfig) None
+        +process(input_signal: Signal, sidechain_input: Signal) Signal
+        +_detect_envelope(signal: Signal) Envelope
+        +_apply_gain_reduction(signal: Signal, envelope: Envelope) Signal
+        +_apply_makeup_gain(signal: Signal) Signal
+    }
+
+    %% ============================================================
+    %% MASTER MIXER EVALUATOR
+    %% ============================================================
+    class MasterMixerEvaluator {
+        <<module>>
+        +evaluation_criteria: List[Criterion]
+        +scoring_weights: Dict[str, float]
+        +__init__(config: MixerConfig) None
+        +evaluate_mix(cypher: CypherResult) MixScore
+        +_score_flow(cypher: CypherResult) float
+        +_score_rhyme(cypher: CypherResult) float
+        +_score_thematic(cypher: CypherResult) float
+        +_score_cultural(cypher: CypherResult) float
+        +generate_feedback(cypher: CypherResult) FeedbackResult
+        +compare_cyphers(cypher_a: CypherResult, cypher_b: CypherResult) ComparisonResult
+    }
+
+    %% ============================================================
+    %% ORCHESTRATOR COMPOSITION
+    %% ============================================================
+    class DualSwarmOrchestrator {
+        +swarm_alpha: LinguisticDAW
+        +swarm_omega: FrankensteinHiveMind
+        +sidechain: SidechainCompressor
+        +mixer: MasterMixerEvaluator
+    }
+
+    DualSwarmOrchestrator *-- LinguisticDAW : "swarm_alpha"
+    DualSwarmOrchestrator *-- FrankensteinHiveMind : "swarm_omega"
+    DualSwarmOrchestrator *-- SidechainCompressor : "sidechain"
+    DualSwarmOrchestrator *-- MasterMixerEvaluator : "mixer"
+
+    LinguisticDAW *-- LinguisticEngine : "linguistic_engine"
+    LinguisticDAW *-- VerseConstructor : "verse_constructor"
+    LinguisticDAW *-- StemGenerator : "stem_generator"
+
+    FrankensteinHiveMind *-- PedigreeAggregator : "pedigree_aggregator"
+    FrankensteinHiveMind *-- StyleSynthesizer : "style_synthesizer"
+    FrankensteinHiveMind *-- EntropyInjector : "entropy_injector"
+    FrankensteinHiveMind *-- MKStudioEnvironment : "mk_studio_env"
+
+    %% ============================================================
+    %% COMMUNICATION TOPOLOGY
+    %% ============================================================
+    LinguisticDAW --> SidechainCompressor : "signal_out"
+    FrankensteinHiveMind --> SidechainCompressor : "signal_out"
+    SidechainCompressor --> MasterMixerEvaluator : "compressed_signal"
+    MasterMixerEvaluator --> LinguisticDAW : "feedback_in"
+    MasterMixerEvaluator --> FrankensteinHiveMind : "feedback_in"
+
+    %% ============================================================
+    %% CODE GENERATION NOTES
+    %% ============================================================
+    note for LinguisticDAW "CODEGEN-HINT: Producer-Consumer pattern. Thread pool for stem generation."
+    note for FrankensteinHiveMind "CODEGEN-HINT: Genetic algorithm integration. Parallel fitness eval."
+    note for SidechainCompressor "CODEGEN-HINT: Real-time DSP. NumPy FFT for envelope detection."
+    note for MasterMixerEvaluator "CODEGEN-HINT: Multi-criteria decision analysis. Weighted sum model."
+
+    note "Swarm Alpha creates the protagonist verse.\nSwarm Omega creates the antagonist verse.\nSidechain mediates signal flow.\nMixer evaluates and provides feedback."
+```

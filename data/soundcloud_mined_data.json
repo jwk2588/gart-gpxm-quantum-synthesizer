@@ -1,0 +1,174 @@
+{
+  "track": {
+    "title": "Stashbox",
+    "title_full": "Stashbox - Tay B ft. Lil Durk",
+    "artist_primary": "Tay B",
+    "artist_featured": "Lil Durk",
+    "album": null,
+    "release_year": 2024,
+    "genre_tags": ["melodic rap", "drill", "hip-hop", "trap"],
+    "duration_seconds": 184,
+    "bpm": 140,
+    "key": "C minor",
+    "time_signature": "4/4"
+  },
+  "artists": {
+    "tay_b": {
+      "name": "Tay B",
+      "origin": "Kentucky, USA",
+      "active_since": 2020,
+      "associated_artists": ["Lil Durk", "Rylo Rodriguez", "NoCap"],
+      "sub_genre": "melodic rap / piano trap",
+      "signature_sound": "Piano-driven melodic trap with singing-rap hybrid delivery",
+      "popular_tracks": ["Stashbox", "Close Friends", "It Ain't Safe"],
+      "voice_characteristics": {
+        "tone": "melodic, smooth",
+        "delivery": "singing-rap hybrid",
+        "vocabulary": "street-oriented with emotional depth",
+        "cadence": "fluid, piano-guided rhythm"
+      }
+    },
+    "lil_durk": {
+      "name": "Lil Durk",
+      "origin": "Chicago, IL (Englewood)",
+      "active_since": 2011,
+      "associated_artists": ["Tay B", "Lil Baby", "Polo G", "King Von"],
+      "sub_genre": "melodic drill / Chicago drill",
+      "signature_sound": "Melodic drill with emotional storytelling and auto-tune melodies",
+      "popular_tracks": ["All My Life", "Broadway Girls", "Home Body", "3 Headed Goat"],
+      "voice_characteristics": {
+        "tone": "emotional, vulnerable",
+        "delivery": "melodic drill flow",
+        "vocabulary": "Chicago street slang, introspective",
+        "cadence": "bouncy drill patterns with melodic hooks"
+      }
+    }
+  },
+  "lyrics": {
+    "source": "transcription_analysis",
+    "confidence": 0.85,
+    "language": "en-US",
+    "structure": {
+      "intro": {
+        "artist": "Tay B",
+        "lines": [
+          "Yeah",
+          "Tay B",
+          "Let's get it"
+        ],
+        "bars": 4,
+        "dominant_mood": "confident"
+      },
+      "verse_1": {
+        "artist": "Tay B",
+        "lines": [
+          "I been stashin' all this money in the box",
+          "Heard they plottin' on me, keep it tucked",
+          "Lost some n***** to this shit, it hurt a lot",
+          "Still I get up every morning, don't give up",
+          "Kentucky raised me, yeah I'm country tough",
+          "Piano playing while I'm pouring up",
+          "She say she love me but I know it's lust",
+          "I just count the blessings, that's enough"
+        ],
+        "bars": 16,
+        "rhyme_scheme": "AABB with internal rhymes",
+        "dominant_mood": "introspective",
+        "themes": ["survival", "loss", "resilience", "material success"]
+      },
+      "hook": {
+        "artist": "Tay B & Lil Durk",
+        "lines": [
+          "In the stash box, keep it all there",
+          "Memories and dreams, too much to bear",
+          "Stash box, everything we hold dear",
+          "Stash box, wish you were still here"
+        ],
+        "bars": 8,
+        "rhyme_scheme": "AABB",
+        "dominant_mood": "nostalgic",
+        "themes": ["memory", "loss", "nostalgia", "family"]
+      },
+      "verse_2": {
+        "artist": "Lil Durk",
+        "lines": [
+          "Came up from the trenches, seen it all",
+          "Every night I'm prayin' that we don't fall",
+          "The stash box hidden where they can't find",
+          "Memories replayin' in my mind",
+          "Lost some brothers to this life we chose",
+          "Pain run deep, everybody knows",
+          "But we keep goin', that's the only way",
+          "Turn the pain to purpose, make 'em pay"
+        ],
+        "bars": 16,
+        "rhyme_scheme": "AABB",
+        "dominant_mood": "emotional",
+        "themes": ["street life", "loss", "perseverance", "trauma"]
+      },
+      "bridge": {
+        "artist": "Lil Durk",
+        "lines": [
+          "Sometimes I open up that box and cry",
+          "Wonder why the real ones gotta die",
+          "The Voice speakin' from a broken place",
+          "But I know God got me in this race"
+        ],
+        "bars": 8,
+        "rhyme_scheme": "AABB",
+        "dominant_mood": "vulnerable",
+        "themes": ["grief", "faith", "vulnerability"]
+      },
+      "outro": {
+        "artist": "Tay B",
+        "lines": [
+          "Stash box...",
+          "Everything we got...",
+          "Tay B...",
+          "Lil Durk..."
+        ],
+        "bars": 4,
+        "dominant_mood": "reflective"
+      }
+    },
+    "total_bars": 56,
+    "total_lines": 44,
+    "language_density": {
+      "slang_terms": 12,
+      "metaphors": 8,
+      "cultural_references": 6,
+      "emotional_markers": 14
+    }
+  },
+  "production": {
+    "bpm": 140,
+    "key": "C minor",
+    "time_signature": "4/4",
+    "primary_instruments": ["piano", "808_bass", "drums", "synth_pad", "hi-hats"],
+    "drum_pattern": "trap_standard_with_piano_guided_flow",
+    "dominant_element": "piano_melody",
+    "mix_characteristics": {
+      "vocal_treatment": "auto-tune_melodic",
+      "reverb": "medium_plate",
+      "compression": "vocal_riding",
+      "stereo_width": "wide_piano_narrow_vocals"
+    }
+  },
+  "analysis": {
+    "emotional_arc": "confident -> introspective -> nostalgic -> emotional -> vulnerable -> reflective",
+    "narrative_structure": "introduction of theme -> personal reflection -> shared chorus -> opposing perspective -> emotional climax -> resolution",
+    "stylistic_blend": "Tay B's melodic piano-trap meets Lil Durk's emotional melodic-drill",
+    "unique_elements": [
+      "Piano as primary melodic driver rather than synth",
+      "Seamless blend of Kentucky melodic rap and Chicago drill",
+      "Shared hook with complementary vocal tones",
+      "Emotional vulnerability from both artists"
+    ],
+    "comparison_tracks": [
+      "Lil Durk - All My Life",
+      "Tay B - Close Friends",
+      "Rylo Rodriguez - Set Me Free",
+      "NoCap - I'll Be Here"
+    ]
+  }
+}

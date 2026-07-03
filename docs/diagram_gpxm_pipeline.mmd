@@ -1,0 +1,315 @@
+```mermaid
+%% GART v3.0 + GPXM - GPXM Pipeline Architecture
+%% INVERSION MODE: Specifies the genetic persona expansion pipeline
+%% @author: Architecture Designer (INVERSION MODE)
+%% @version: 3.0.0
+
+classDiagram
+    direction TB
+
+    %% ============================================================
+    %% GPXM PIPELINE CONTROLLER
+    %% ============================================================
+    class GPXMPipeline {
+        <<module>>
+        +stage_ingestion: DataIngestionStage
+        +stage_embedding: EmbeddingGenerationStage
+        +stage_memory_init: MemoryInitializationStage
+        +stage_persona_synthesis: PersonaSynthesisStage
+        +stage_script_generation: ScriptGenerationStage
+        +stage_validation: ValidationStage
+        +config: PipelineConfig
+        +__init__(config: PipelineConfig) None
+        +run(seed_identity: IdentitySeed) GeneticPersona
+        +run_batch(seeds: List[IdentitySeed]) List[GeneticPersona]
+        +_execute_stage(stage: PipelineStage, context: PipelineContext) StageResult
+        +rollback(to_stage: str) None
+        +get_pipeline_status() PipelineStatus
+    }
+
+    %% ============================================================
+    %% STAGE 1: DATA INGESTION
+    %% ============================================================
+    class DataIngestionStage {
+        <<module>>
+        +scrapers: List[DataScraper]
+        +normalizers: List[DataNormalizer]
+        +validators: List[DataValidator]
+        +__init__() None
+        +execute(context: PipelineContext) StageResult
+        +scrape_soundcloud(artist_name: str) RawData
+        +scrape_youtube(artist_name: str) RawData
+        +scrape_spotify(artist_name: str) RawData
+        +scrape_genius(artist_name: str) RawData
+        +scrape_social_media(artist_name: str) RawData
+        +normalize(data: RawData) NormalizedData
+        +validate(data: NormalizedData) ValidationResult
+    }
+
+    class DataScraper {
+        <<abstract>>
+        +source_name: str
+        +rate_limiter: RateLimiter
+        +__init__(source: str) None
+        +scrape(query: str) RawData*
+        +_handle_rate_limit() None
+        +_parse_response(response: Response) RawData
+    }
+
+    class SoundCloudScraper {
+        +api_endpoint: str
+        +auth_token: str
+        +scrape(query: str) RawData
+    }
+
+    class YouTubeScraper {
+        +api_key: str
+        +scrape(query: str) RawData
+    }
+
+    class SpotifyScraper {
+        +client_id: str
+        +client_secret: str
+        +scrape(query: str) RawData
+    }
+
+    class GeniusScraper {
+        +access_token: str
+        +scrape(query: str) RawData
+    }
+
+    %% ============================================================
+    %% STAGE 2: EMBEDDING GENERATION
+    %% ============================================================
+    class EmbeddingGenerationStage {
+        <<module>>
+        +embedding_model: EmbeddingModel
+        +batch_size: int
+        +__init__(model: EmbeddingModel) None
+        +execute(context: PipelineContext) StageResult
+        +generate_text_embedding(text: str) EmbeddingVector
+        +generate_audio_embedding(audio: AudioData) EmbeddingVector
+        +generate_multi_modal_embedding(text: str, audio: AudioData) EmbeddingVector
+        +batch_generate(texts: List[str]) List[EmbeddingVector]
+    }
+
+    class EmbeddingModel {
+        <<abstract>>
+        +model_name: str
+        +dimension: int
+        +__init__(name: str) None
+        +encode(text: str) EmbeddingVector*
+        +encode_audio(audio: AudioData) EmbeddingVector*
+    }
+
+    class TransformerEmbedding {
+        +transformer: PreTrainedModel
+        +tokenizer: PreTrainedTokenizer
+        +encode(text: str) EmbeddingVector
+        +encode_audio(audio: AudioData) EmbeddingVector
+    }
+
+    class CLAPEmbedding {
+        +clap_model: CLAPModel
+        +encode(text: str) EmbeddingVector
+        +encode_audio(audio: AudioData) EmbeddingVector
+    }
+
+    %% ============================================================
+    %% STAGE 3: MEMORY INITIALIZATION
+    %% ============================================================
+    class MemoryInitializationStage {
+        <<module>>
+        +memory_bank_factory: MemoryBankFactory
+        +__init__() None
+        +execute(context: PipelineContext) StageResult
+        +initialize_session_memory() SessionMemory
+        +initialize_project_memory() ProjectMemory
+        +initialize_core_identity() CoreIdentityMemory
+        +initialize_episodic_memory() EventMemory
+        +initialize_semantic_memory() KnowledgeMemory
+        +link_memories(memories: List[Memory]) MemoryGraph
+    }
+
+    class MemoryBankFactory {
+        +config: MemoryConfig
+        +create_memory_bank() ExpansiveMemoryBank
+        +create_tier(tier_type: str) MemoryTier
+    }
+
+    %% ============================================================
+    %% STAGE 4: PERSONA SYNTHESIS
+    %% ============================================================
+    class PersonaSynthesisStage {
+        <<module>>
+        +identity_builder: IdentityBuilder
+        +genetic_optimizer: GeneticOptimizer
+        +__init__() None
+        +execute(context: PipelineContext) StageResult
+        +synthesize_identity(embeddings: List[EmbeddingVector>) IdentityCore
+        +optimize_genetics(identity: IdentityCore) OptimizedIdentity
+        +evolve_persona(identity: IdentityCore, generations: int) GeneticPersona
+        +validate_persona(persona: GeneticPersona) ValidationResult
+    }
+
+    class IdentityBuilder {
+        +embedding_fusion: FusionStrategy
+        +trait_extractor: TraitExtractor
+        +__init__() None
+        +build(embeddings: List[EmbeddingVector>) IdentityCore
+        +extract_traits(embedding: EmbeddingVector) TraitVector
+        +fuse_embeddings(embeddings: List[EmbeddingVector>) EmbeddingVector
+    }
+
+    class GeneticOptimizer {
+        +population_size: int
+        +mutation_rate: float
+        +crossover_rate: float
+        +generations: int
+        +__init__(config: GAConfig) None
+        +optimize(identity: IdentityCore) OptimizedIdentity
+        +evaluate_fitness(individual: IdentityCore) float
+        +select_parents(population: List[IdentityCore]) Tuple[IdentityCore, IdentityCore]
+        +crossover(parent_a: IdentityCore, parent_b: IdentityCore) IdentityCore
+        +mutate(individual: IdentityCore) IdentityCore
+    }
+
+    %% ============================================================
+    %% STAGE 5: ENTROPIC SCRIPT GENERATION
+    %% ============================================================
+    class ScriptGenerationStage {
+        <<module>>
+        +script_engine: EntropicScriptEngine
+        +entropy_controller: EntropyController
+        +__init__() None
+        +execute(context: PipelineContext) StageResult
+        +generate_vocabulary_matrix(persona: GeneticPersona) VocabularyMatrix
+        +generate_flow_architecture(persona: GeneticPersona) FlowArchitecture
+        +generate_thematic_engine(persona: GeneticPersona) ThematicEngine
+        +generate_prosodic_features(persona: GeneticPersona) ProsodicFeatures
+        +generate_cultural_semantics(persona: GeneticPersona) CulturalSemantics
+        +apply_guardrails(script: EntropicScript) EntropicScript
+    }
+
+    class EntropicScriptEngine {
+        +layer_1_vocab: VocabularyLayer
+        +layer_2_flow: FlowLayer
+        +layer_3_thematic: ThematicLayer
+        +layer_4_prosody: ProsodyLayer
+        +layer_5_culture: CultureLayer
+        +__init__() None
+        +generate_all(persona: GeneticPersona) EntropicScript
+        +_layer_1_generate_vocab(persona: GeneticPersona) VocabularyMatrix
+        +_layer_2_generate_flow(persona: GeneticPersona) FlowArchitecture
+        +_layer_3_generate_thematic(persona: GeneticPersona) ThematicEngine
+        +_layer_4_generate_prosody(persona: GeneticPersona) ProsodicFeatures
+        +_layer_5_generate_culture(persona: GeneticPersona) CulturalSemantics
+    }
+
+    class EntropyController {
+        +target_entropy: float
+        +current_entropy: float
+        +regulator: EntropyRegulator
+        +__init__(target: float) None
+        +measure(script: EntropicScript) float
+        +regulate(measured: float) float
+        +inject_stimulus() Stimulus
+        +apply_anchor() Anchor
+    }
+
+    %% ============================================================
+    %% STAGE 6: VALIDATION
+    %% ============================================================
+    class ValidationStage {
+        <<module>>
+        +validators: List[Validator]
+        +__init__() None
+        +execute(context: PipelineContext) StageResult
+        +validate_coherence(persona: GeneticPersona) CoherenceScore
+        +validate_consistency(persona: GeneticPersona) ConsistencyScore
+        +validate_creativity(persona: GeneticPersona) CreativityScore
+        +validate_authenticity(persona: GeneticPersona) AuthenticityScore
+        +run_full_validation(persona: GeneticPersona) ValidationReport
+    }
+
+    class Validator {
+        <<abstract>>
+        +name: str
+        +__init__(name: str) None
+        +validate(persona: GeneticPersona) ValidationResult*
+    }
+
+    class CoherenceValidator {
+        +validate(persona: GeneticPersona) ValidationResult
+    }
+
+    class ConsistencyValidator {
+        +validate(persona: GeneticPersona) ValidationResult
+    }
+
+    class CreativityValidator {
+        +validate(persona: GeneticPersona) ValidationResult
+    }
+
+    class AuthenticityValidator {
+        +validate(persona: GeneticPersona) ValidationResult
+    }
+
+    %% ============================================================
+    %% INHERITANCE
+    %% ============================================================
+    DataScraper <|-- SoundCloudScraper : "implements"
+    DataScraper <|-- YouTubeScraper : "implements"
+    DataScraper <|-- SpotifyScraper : "implements"
+    DataScraper <|-- GeniusScraper : "implements"
+
+    EmbeddingModel <|-- TransformerEmbedding : "implements"
+    EmbeddingModel <|-- CLAPEmbedding : "implements"
+
+    Validator <|-- CoherenceValidator : "implements"
+    Validator <|-- ConsistencyValidator : "implements"
+    Validator <|-- CreativityValidator : "implements"
+    Validator <|-- AuthenticityValidator : "implements"
+
+    %% ============================================================
+    %% COMPOSITION
+    %% ============================================================
+    GPXMPipeline *-- DataIngestionStage : "stage_1"
+    GPXMPipeline *-- EmbeddingGenerationStage : "stage_2"
+    GPXMPipeline *-- MemoryInitializationStage : "stage_3"
+    GPXMPipeline *-- PersonaSynthesisStage : "stage_4"
+    GPXMPipeline *-- ScriptGenerationStage : "stage_5"
+    GPXMPipeline *-- ValidationStage : "stage_6"
+
+    DataIngestionStage *-- DataScraper : "scrapers (1..*)"
+    EmbeddingGenerationStage *-- EmbeddingModel : "embedding_model"
+    MemoryInitializationStage *-- MemoryBankFactory : "memory_bank_factory"
+    PersonaSynthesisStage *-- IdentityBuilder : "identity_builder"
+    PersonaSynthesisStage *-- GeneticOptimizer : "genetic_optimizer"
+    ScriptGenerationStage *-- EntropicScriptEngine : "script_engine"
+    ScriptGenerationStage *-- EntropyController : "entropy_controller"
+    ValidationStage *-- Validator : "validators (1..*)"
+
+    EntropicScriptEngine *-- EntropyController : "entropy_controller"
+
+    %% ============================================================
+    %% PIPELINE FLOW
+    %% ============================================================
+    DataIngestionStage --> EmbeddingGenerationStage : "normalized_data"
+    EmbeddingGenerationStage --> MemoryInitializationStage : "embeddings"
+    MemoryInitializationStage --> PersonaSynthesisStage : "memory_bank"
+    PersonaSynthesisStage --> ScriptGenerationStage : "genetic_persona"
+    ScriptGenerationStage --> ValidationStage : "entropic_script"
+    ValidationStage --> GPXMPipeline : "final_persona"
+
+    %% ============================================================
+    %% CODE GEN NOTES
+    %% ============================================================
+    note for GPXMPipeline "CODEGEN-HINT: Chain of Responsibility pattern. Stage rollback with Memento."
+    note for DataIngestionStage "CODEGEN-HINT: Async scrapers. aiohttp + asyncio. Rate limiting with token bucket."
+    note for EmbeddingGenerationStage "CODEGEN-HINT: Batch inference. GPU offload. Embedding cache with LRU."
+    note for MemoryInitializationStage "CODEGEN-HINT: Lazy initialization. Memory graph with NetworkX."
+    note for PersonaSynthesisStage "CODEGEN-HINT: GA with DEAP or custom. Fitness caching."
+    note for ScriptGenerationStage "CODEGEN-HINT: 5-layer stack. Each layer is a Strategy."
+    note for ValidationStage "CODEGEN-HINT: Composite pattern. Parallel validators with asyncio."
+```
