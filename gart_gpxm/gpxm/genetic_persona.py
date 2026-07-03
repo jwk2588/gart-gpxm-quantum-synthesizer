@@ -1,15 +1,15 @@
 """
-Genetic Persona with Expansive Memory — GPXM Core Module.
+Genetic Persona — Artist DNA + Skill-Inheritance Engine for GART v3.0.
 
-Implements the full GeneticPersona dataclass with five-tier expansive memory:
-    - SessionMemory (ST): Hours TTL, real-time
-    - ProjectMemory (MT): Days TTL, per-project
-    - CoreIdentityMemory (LT): Months TTL, personal facts & beliefs
-    - EpisodicMemory: Events with temporal indexing
-    - SemanticMemory: Structured knowledge graph
+Combines parent/child skill crossover with mutation rate control and
+virtual-twin diff checking to produce artist DNA profiles.
 
-Plus VoiceDifferentiationParameters, MemoryEntry hierarchy,
-consolidation pipelines, and genetic evolution operators.
+Components:
+    - ArtistDNA: Immutable dataclass holding skill inheritance data
+    - SkillGene: Individual skill with dominance/recessiveness
+    - GeneticPersona: Main builder class with crossover + mutation
+    - GenealogicalTree: Family tree tracking across generations
+    - TwinDiffChecker: Virtual-twin collision detection
 
 Author: GART Architecture Team
 Version: 3.0.0
@@ -17,838 +17,874 @@ Version: 3.0.0
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
-import uuid
-from copy import deepcopy
+import math
+import random
+import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Protocol, Set, Tuple
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# VoiceDifferentiationParameters
+# Exceptions
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class VoiceDifferentiationParameters:
-    """Parameters that distinguish one artist's voice from another.
+class GeneticError(Exception):
+    """Base exception for genetic persona operations."""
+
+
+class MutationError(GeneticError):
+    """Raised when mutation produces invalid genetic data."""
+
+
+class CrossoverError(GeneticError):
+    """Raised when crossover between incompatible DNAs fails."""
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class GeneDominance(Enum):
+    """Gene dominance levels for skill inheritance."""
+
+    DOMINANT = "dominant"      # Always expressed when present
+    RECESSIVE = "recessive"    # Only expressed without dominant allele
+    CODOMINANT = "codominant"  # Both alleles expressed
+    VARIABLE = "variable"      # Expression varies by context
+
+
+class GeneType(Enum):
+    """Types of genetic skill genes."""
+
+    FLOW = "flow"
+    DELIVERY = "delivery"
+    LYRICAL_DENSITY = "lyrical_density"
+    WORDPLAY = "wordplay"
+    STORYTELLING = "storytelling"
+    CADENCE = "cadence"
+    RHYME_COMPLEXITY = "rhyme_complexity"
+    VOCAL_PRESENCE = "vocal_presence"
+    EMOTIONAL_RANGE = "emotional_range"
+    CULTURAL_DEPTH = "cultural_depth"
+    BREATH_CONTROL = "breath_control"
+    AD_LIB_STYLE = "ad_lib_style"
+    PUNCHLINE_DENSITY = "punchline_density"
+    BEAT_SELECTION = "beat_selection"
+    COLLAB_CHEMISTRY = "collab_chemistry"
+
+
+class MutationType(Enum):
+    """Types of mutations that can occur in artist DNA."""
+
+    POINT = "point"          # Single skill value change
+    INSERTION = "insertion"  # New skill gene added
+    DELETION = "deletion"    # Skill gene removed
+    INVERSION = "inversion"  # Skill order reversed
+    AMPLIFICATION = "amplification"  # Skill value boosted
+    EPISTATIC = "epistatic"  # Gene interaction change
+
+
+# ---------------------------------------------------------------------------
+# Data Structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SkillGene:
+    """An individual skill gene with genetic properties.
 
     Attributes:
-        vocabulary_tier: Vocabulary complexity tier (Street, Mixed, Literary, Technical).
-        slang_density: Slang usage frequency (Low, Medium, High, Very High).
-        sentence_length: Average sentence length (Short, Medium, Long, Variable).
-        pause_pattern: Pause placement style (End-Heavy, Even, Staccato, Flowing).
-        emotional_range: Emotional spectrum breadth (Narrow, Medium, Wide, Extreme).
-        cultural_markers: Cultural/geographic identity markers.
-        narrative_mode: Storytelling approach (Linear, Fragmented, Abstract, Cinematic).
-        call_response: Call-and-response pattern (None, Echo, Question, Direct).
+        gene_type: Type of skill gene.
+        base_value: Base skill level (0.0-1.0).
+        dominance: Dominance level for inheritance.
+        mutation_rate: Probability of mutation per generation.
+        allele_variants: List of possible allele values.
+        expression_threshold: Minimum value for phenotypic expression.
     """
 
-    vocabulary_tier: str = "Mixed"
-    slang_density: str = "Medium"
-    sentence_length: str = "Medium"
-    pause_pattern: str = "Even"
-    emotional_range: str = "Medium"
-    cultural_markers: str = ""
-    narrative_mode: str = "Linear"
-    call_response: str = "None"
+    gene_type: GeneType
+    base_value: float = 0.5
+    dominance: GeneDominance = GeneDominance.DOMINANT
+    mutation_rate: float = 0.05
+    allele_variants: Tuple[float, ...] = field(default_factory=tuple)
+    expression_threshold: float = 0.3
 
-    def compare(self, other: VoiceDifferentiationParameters) -> float:
-        """Compare two voice parameter sets.
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.base_value <= 1.0):
+            raise ValueError(f"base_value must be 0.0-1.0, got {self.base_value}")
+        if not (0.0 <= self.mutation_rate <= 1.0):
+            raise ValueError(f"mutation_rate must be 0.0-1.0, got {self.mutation_rate}")
+        if not (0.0 <= self.expression_threshold <= 1.0):
+            raise ValueError(f"expression_threshold must be 0.0-1.0")
+
+    def mutate(self, mutation_type: MutationType, rng: random.Random) -> SkillGene:
+        """Apply a mutation to this gene.
 
         Args:
-            other: Other voice parameters to compare against.
+            mutation_type: Type of mutation to apply.
+            rng: Random number generator.
 
         Returns:
-            Similarity score (0.0-1.0), higher = more similar.
+            New SkillGene with mutation applied.
+
+        Raises:
+            MutationError: If mutation produces invalid values.
         """
-        score = 0.0
-        fields = [
-            "vocabulary_tier", "slang_density", "sentence_length",
-            "pause_pattern", "emotional_range", "narrative_mode",
-            "call_response",
-        ]
-        for f in fields:
-            if getattr(self, f) == getattr(other, f):
-                score += 1.0 / len(fields)
-        return score
+        try:
+            if mutation_type == MutationType.POINT:
+                delta = rng.uniform(-0.1, 0.1)
+                new_value = max(0.0, min(1.0, self.base_value + delta))
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=new_value,
+                    dominance=self.dominance,
+                    mutation_rate=min(1.0, self.mutation_rate * 1.1),
+                    allele_variants=self.allele_variants,
+                    expression_threshold=self.expression_threshold,
+                )
+            elif mutation_type == MutationType.AMPLIFICATION:
+                new_value = min(1.0, self.base_value * 1.2)
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=new_value,
+                    dominance=self.dominance,
+                    mutation_rate=self.mutation_rate,
+                    allele_variants=self.allele_variants,
+                    expression_threshold=self.expression_threshold,
+                )
+            elif mutation_type == MutationType.INSERTION:
+                new_alleles = list(self.allele_variants)
+                new_alleles.append(rng.uniform(0.0, 1.0))
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=self.base_value,
+                    dominance=self.dominance,
+                    mutation_rate=self.mutation_rate,
+                    allele_variants=tuple(new_alleles),
+                    expression_threshold=self.expression_threshold,
+                )
+            elif mutation_type == MutationType.DELETION:
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=max(0.0, self.base_value - 0.15),
+                    dominance=self.dominance,
+                    mutation_rate=self.mutation_rate,
+                    allele_variants=self.allele_variants,
+                    expression_threshold=self.expression_threshold,
+                )
+            elif mutation_type == MutationType.INVERSION:
+                new_value = 1.0 - self.base_value
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=new_value,
+                    dominance=self.dominance,
+                    mutation_rate=self.mutation_rate,
+                    allele_variants=self.allele_variants,
+                    expression_threshold=self.expression_threshold,
+                )
+            elif mutation_type == MutationType.EPISTATIC:
+                # Epistatic: change dominance pattern
+                new_dominance = rng.choice(list(GeneDominance))
+                return SkillGene(
+                    gene_type=self.gene_type,
+                    base_value=self.base_value,
+                    dominance=new_dominance,
+                    mutation_rate=self.mutation_rate,
+                    allele_variants=self.allele_variants,
+                    expression_threshold=self.expression_threshold,
+                )
+            else:
+                raise MutationError(f"Unknown mutation type: {mutation_type}")
+        except Exception as e:
+            raise MutationError(f"Mutation failed for {self.gene_type}: {e}")
+
+    def express(self) -> float:
+        """Calculate phenotypic expression level of this gene.
+
+        Returns:
+            Expression value (0.0-1.0), 0.0 if below threshold.
+        """
+        if self.base_value < self.expression_threshold:
+            return 0.0
+        return self.base_value
 
 
-# ---------------------------------------------------------------------------
-# Memory Entry hierarchy
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class MemoryEntry:
-    """Base class for all memory entries.
+@dataclass(frozen=True)
+class ArtistDNA:
+    """Immutable artist DNA profile containing all skill genes.
 
     Attributes:
-        content: The memory content.
-        timestamp: When the memory was created.
-        source: Source of the memory (e.g., "ingestion", "generation").
-        confidence: Confidence score (0.0-1.0).
-        metadata: Additional metadata.
+        persona_id: Unique identifier for this DNA profile.
+        generation: Generation number (0 = original).
+        parent_ids: Tuple of parent persona IDs.
+        genes: Dict of GeneType -> SkillGene mapping.
+        timestamp: Creation timestamp.
+        mutation_history: List of applied mutations.
+        signature: SHA-256 fingerprint of the DNA.
     """
 
-    content: str
-    timestamp: datetime = field(default_factory=datetime.now)
-    source: str = "unknown"
-    confidence: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    persona_id: str
+    generation: int = 0
+    parent_ids: Tuple[str, ...] = field(default_factory=tuple)
+    genes: Dict[GeneType, SkillGene] = field(default_factory=dict)
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    mutation_history: List[Dict[str, Any]] = field(default_factory=list)
+    signature: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
+    def __post_init__(self) -> None:
+        # Compute signature if not provided
+        if not self.signature:
+            sig = self._compute_signature()
+            object.__setattr__(self, "signature", sig)
+
+    def _compute_signature(self) -> str:
+        """Compute SHA-256 signature of this DNA profile.
+
+        Returns:
+            Hex digest string.
+        """
+        data = {
+            "persona_id": self.persona_id,
+            "generation": self.generation,
+            "parent_ids": self.parent_ids,
+            "genes": {k.value: v.base_value for k, v in self.genes.items()},
+            "timestamp": self.timestamp,
+        }
+        json_str = json.dumps(data, sort_keys=True)
+        return hashlib.sha256(json_str.encode()).hexdigest()[:16]
+
+    def get_expressed_traits(self) -> Dict[GeneType, float]:
+        """Get all expressed (above-threshold) traits.
+
+        Returns:
+            Dict of GeneType to expression value.
+        """
         return {
-            "content": self.content,
-            "timestamp": self.timestamp.isoformat(),
-            "source": self.source,
-            "confidence": self.confidence,
-            "metadata": self.metadata,
+            gene_type: gene.express()
+            for gene_type, gene in self.genes.items()
+            if gene.express() > 0
         }
 
+    def get_trait_value(self, gene_type: GeneType) -> float:
+        """Get the expression value of a specific trait.
 
-@dataclass
-class SessionMemoryEntry(MemoryEntry):
-    """A session-scoped memory entry (hours TTL).
-
-    Attributes:
-        session_id: Unique session identifier.
-        ttl_hours: Time-to-live in hours.
-    """
-
-    session_id: str = ""
-    ttl_hours: float = 4.0
-
-    def is_expired(self) -> bool:
-        """Check if this session memory has expired.
+        Args:
+            gene_type: The gene type to query.
 
         Returns:
-            True if expired.
+            Expression value (0.0 if gene not present).
         """
-        age = datetime.now() - self.timestamp
-        return age > timedelta(hours=self.ttl_hours)
+        gene = self.genes.get(gene_type)
+        return gene.express() if gene else 0.0
 
+    def get_overall_fitness(self) -> float:
+        """Compute overall fitness score across all traits.
 
-@dataclass
-class ProjectMemoryEntry(MemoryEntry):
-    """A project-scoped memory entry (days TTL).
+        Returns:
+            Average expression value of all genes.
+        """
+        if not self.genes:
+            return 0.0
+        return sum(g.express() for g in self.genes.values()) / len(self.genes)
 
-    Attributes:
-        project_id: Project identifier.
-        ttl_days: Time-to-live in days.
-    """
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize DNA to dictionary.
 
-    project_id: str = ""
-    ttl_days: float = 7.0
+        Returns:
+            Dictionary representation.
+        """
+        return {
+            "persona_id": self.persona_id,
+            "generation": self.generation,
+            "parent_ids": list(self.parent_ids),
+            "genes": {
+                k.value: {
+                    "base_value": v.base_value,
+                    "dominance": v.dominance.value,
+                    "mutation_rate": v.mutation_rate,
+                    "allele_variants": list(v.allele_variants),
+                    "expression_threshold": v.expression_threshold,
+                }
+                for k, v in self.genes.items()
+            },
+            "timestamp": self.timestamp,
+            "mutation_history": self.mutation_history,
+            "signature": self.signature,
+        }
 
-    def is_expired(self) -> bool:
-        """Check if this project memory has expired."""
-        age = datetime.now() - self.timestamp
-        return age > timedelta(days=self.ttl_days)
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> ArtistDNA:
+        """Deserialize DNA from dictionary.
 
+        Args:
+            data: Dictionary representation.
 
-@dataclass
-class CoreIdentityEntry(MemoryEntry):
-    """A core identity memory entry (months TTL).
+        Returns:
+            ArtistDNA instance.
+        """
+        genes = {}
+        for gene_name, gene_data in data.get("genes", {}).items():
+            gene_type = GeneType(gene_name)
+            genes[gene_type] = SkillGene(
+                gene_type=gene_type,
+                base_value=gene_data["base_value"],
+                dominance=GeneDominance(gene_data["dominance"]),
+                mutation_rate=gene_data["mutation_rate"],
+                allele_variants=tuple(gene_data.get("allele_variants", [])),
+                expression_threshold=gene_data.get("expression_threshold", 0.3),
+            )
 
-    These are long-term personal facts and beliefs.
-
-    Attributes:
-        category: Identity category (e.g., "belief", "value", "preference").
-        ttl_months: Time-to-live in months.
-    """
-
-    category: str = "belief"
-    ttl_months: float = 6.0
-
-    def is_expired(self) -> bool:
-        """Check if this core identity memory has expired."""
-        age = datetime.now() - self.timestamp
-        return age > timedelta(days=self.ttl_months * 30)
-
-
-@dataclass
-class EpisodicMemoryEntry(MemoryEntry):
-    """An episodic memory entry (event with temporal indexing).
-
-    Attributes:
-        event_type: Type of event.
-        participants: List of participant identifiers.
-        location: Event location.
-    """
-
-    event_type: str = "interaction"
-    participants: List[str] = field(default_factory=list)
-    location: str = ""
-
-
-@dataclass
-class SemanticMemoryEntry(MemoryEntry):
-    """A semantic memory entry (structured knowledge).
-
-    Attributes:
-        subject: Knowledge subject.
-        predicate: Knowledge predicate.
-        object: Knowledge object.
-        certainty: Certainty score (0.0-1.0).
-    """
-
-    subject: str = ""
-    predicate: str = ""
-    object: str = ""
-    certainty: float = 1.0
-
-    def as_triple(self) -> Tuple[str, str, str]:
-        """Return as (subject, predicate, object) triple."""
-        return (self.subject, self.predicate, self.object)
+        return cls(
+            persona_id=data["persona_id"],
+            generation=data.get("generation", 0),
+            parent_ids=tuple(data.get("parent_ids", [])),
+            genes=genes,
+            timestamp=data.get("timestamp", datetime.now().isoformat()),
+            mutation_history=data.get("mutation_history", []),
+            signature=data.get("signature", ""),
+        )
 
 
 # ---------------------------------------------------------------------------
-# Memory tiers
+# TwinDiffChecker
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class SessionMemory:
-    """Short-term session memory (ST tier).
+class TwinDiffChecker:
+    """Detects collisions between virtual twins (DNA siblings).
 
-    Stores recent interactions with hours-level TTL.
+    Compares two DNA profiles to find genetic similarity and
+    potential collision points where twins are too similar.
     """
 
-    entries: List[SessionMemoryEntry] = field(default_factory=list)
-    max_entries: int = 100
+    def __init__(self, similarity_threshold: float = 0.85) -> None:
+        self.similarity_threshold = similarity_threshold
 
-    def add(self, entry: SessionMemoryEntry) -> None:
-        """Add a session memory entry."""
-        self.entries.append(entry)
-        if len(self.entries) > self.max_entries:
-            self.entries = self.entries[-self.max_entries:]
+    def compute_similarity(self, dna1: ArtistDNA, dna2: ArtistDNA) -> float:
+        """Compute genetic similarity between two DNA profiles.
 
-    def get_recent(self, count: int = 10) -> List[SessionMemoryEntry]:
-        """Get recent non-expired entries."""
-        return [e for e in self.entries[-count:] if not e.is_expired()]
+        Uses cosine similarity over the gene expression vectors.
 
-    def prune_expired(self) -> int:
-        """Remove expired entries. Returns count removed."""
-        before = len(self.entries)
-        self.entries = [e for e in self.entries if not e.is_expired()]
-        return before - len(self.entries)
+        Args:
+            dna1: First DNA profile.
+            dna2: Second DNA profile.
 
-    def clear(self) -> None:
-        """Clear all entries."""
-        self.entries.clear()
+        Returns:
+            Similarity score (0.0-1.0).
+        """
+        all_genes = set(dna1.genes.keys()) | set(dna2.genes.keys())
+        if not all_genes:
+            return 0.0
 
+        vec1 = [dna1.genes.get(g, SkillGene(g)).base_value for g in all_genes]
+        vec2 = [dna2.genes.get(g, SkillGene(g)).base_value for g in all_genes]
 
-@dataclass
-class ProjectMemory:
-    """Medium-term project memory (MT tier).
+        dot = sum(a * b for a, b in zip(vec1, vec2))
+        mag1 = math.sqrt(sum(a * a for a in vec1))
+        mag2 = math.sqrt(sum(b * b for b in vec2))
 
-    Stores project-specific context with days-level TTL.
-    """
+        if mag1 == 0 or mag2 == 0:
+            return 0.0
+        return dot / (mag1 * mag2)
 
-    entries: List[ProjectMemoryEntry] = field(default_factory=list)
-    max_entries: int = 500
+    def check_collision(self, dna1: ArtistDNA, dna2: ArtistDNA) -> Dict[str, Any]:
+        """Check for collision between two DNA profiles.
 
-    def add(self, entry: ProjectMemoryEntry) -> None:
-        """Add a project memory entry."""
-        self.entries.append(entry)
-        if len(self.entries) > self.max_entries:
-            self.entries = self.entries[-self.max_entries:]
+        Args:
+            dna1: First DNA profile.
+            dna2: Second DNA profile.
 
-    def get_for_project(self, project_id: str) -> List[ProjectMemoryEntry]:
-        """Get entries for a specific project."""
-        return [e for e in self.entries if e.project_id == project_id and not e.is_expired()]
+        Returns:
+            Collision report dictionary.
+        """
+        similarity = self.compute_similarity(dna1, dna2)
+        is_collision = similarity >= self.similarity_threshold
 
-    def prune_expired(self) -> int:
-        """Remove expired entries."""
-        before = len(self.entries)
-        self.entries = [e for e in self.entries if not e.is_expired()]
-        return before - len(self.entries)
+        # Find specific gene collisions
+        gene_collisions: List[Dict[str, Any]] = []
+        for gene_type in set(dna1.genes.keys()) & set(dna2.genes.keys()):
+            g1 = dna1.genes[gene_type]
+            g2 = dna2.genes[gene_type]
+            gene_sim = 1.0 - abs(g1.base_value - g2.base_value)
+            if gene_sim >= self.similarity_threshold:
+                gene_collisions.append({
+                    "gene_type": gene_type.value,
+                    "similarity": gene_sim,
+                    "values": [g1.base_value, g2.base_value],
+                })
 
+        return {
+            "collision_detected": is_collision,
+            "similarity_score": similarity,
+            "threshold": self.similarity_threshold,
+            "gene_collisions": gene_collisions,
+            "dna1_id": dna1.persona_id,
+            "dna2_id": dna2.persona_id,
+        }
 
-@dataclass
-class CoreIdentityMemory:
-    """Long-term core identity memory (LT tier).
+    def find_all_collisions(
+        self,
+        dna_profiles: List[ArtistDNA],
+    ) -> List[Dict[str, Any]]:
+        """Find all collision pairs in a population.
 
-    Stores fundamental personal facts and beliefs with months-level TTL.
-    """
+        Args:
+            dna_profiles: List of DNA profiles to check.
 
-    entries: List[CoreIdentityEntry] = field(default_factory=list)
-
-    def add(self, entry: CoreIdentityEntry) -> None:
-        """Add a core identity entry."""
-        self.entries.append(entry)
-
-    def get_by_category(self, category: str) -> List[CoreIdentityEntry]:
-        """Get entries by category."""
-        return [e for e in self.entries if e.category == category and not e.is_expired()]
-
-    def get_beliefs(self) -> List[CoreIdentityEntry]:
-        """Get all belief entries."""
-        return self.get_by_category("belief")
-
-    def get_values(self) -> List[CoreIdentityEntry]:
-        """Get all value entries."""
-        return self.get_by_category("value")
-
-    def prune_expired(self) -> int:
-        """Remove expired entries."""
-        before = len(self.entries)
-        self.entries = [e for e in self.entries if not e.is_expired()]
-        return before - len(self.entries)
-
-
-@dataclass
-class EpisodicMemory:
-    """Episodic memory for event-based recall.
-
-    Stores events with temporal indexing for autobiographical recall.
-    """
-
-    entries: List[EpisodicMemoryEntry] = field(default_factory=list)
-
-    def add(self, entry: EpisodicMemoryEntry) -> None:
-        """Add an episodic memory entry."""
-        self.entries.append(entry)
-
-    def get_by_event_type(self, event_type: str) -> List[EpisodicMemoryEntry]:
-        """Get entries by event type."""
-        return [e for e in self.entries if e.event_type == event_type]
-
-    def get_by_participant(self, participant: str) -> List[EpisodicMemoryEntry]:
-        """Get entries involving a participant."""
-        return [e for e in self.entries if participant in e.participants]
-
-    def get_timeline(self) -> List[EpisodicMemoryEntry]:
-        """Get all entries sorted by timestamp."""
-        return sorted(self.entries, key=lambda e: e.timestamp)
-
-
-@dataclass
-class SemanticMemory:
-    """Semantic memory for structured knowledge.
-
-    Stores facts as subject-predicate-object triples.
-    """
-
-    entries: List[SemanticMemoryEntry] = field(default_factory=list)
-
-    def add(self, entry: SemanticMemoryEntry) -> None:
-        """Add a semantic memory entry."""
-        self.entries.append(entry)
-
-    def query(self, subject: str) -> List[SemanticMemoryEntry]:
-        """Query entries by subject."""
-        return [e for e in self.entries if e.subject.lower() == subject.lower()]
-
-    def query_triple(self, subject: str, predicate: str) -> List[SemanticMemoryEntry]:
-        """Query entries by subject and predicate."""
-        return [
-            e for e in self.entries
-            if e.subject.lower() == subject.lower()
-            and e.predicate.lower() == predicate.lower()
-        ]
-
-    def get_knowledge_graph(self) -> List[Tuple[str, str, str]]:
-        """Get all entries as triples."""
-        return [e.as_triple() for e in self.entries]
+        Returns:
+            List of collision reports.
+        """
+        collisions = []
+        for i in range(len(dna_profiles)):
+            for j in range(i + 1, len(dna_profiles)):
+                report = self.check_collision(dna_profiles[i], dna_profiles[j])
+                if report["collision_detected"]:
+                    collisions.append(report)
+        return collisions
 
 
 # ---------------------------------------------------------------------------
-# ConsolidationResult
+# GenealogicalTree
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class ConsolidationResult:
-    """Result of a memory consolidation operation.
+class GenealogicalTree:
+    """Tracks family lineage across generations.
 
-    Attributes:
-        st_to_mt_entries: Number of session entries promoted to project.
-        mt_to_lt_entries: Number of project entries promoted to core identity.
-        pruned_entries: Total number of expired entries removed.
-        new_lt_entries: New long-term entries created.
-        summary: Human-readable consolidation summary.
-    """
-
-    st_to_mt_entries: int = 0
-    mt_to_lt_entries: int = 0
-    pruned_entries: int = 0
-    new_lt_entries: int = 0
-    summary: str = ""
-
-
-# ---------------------------------------------------------------------------
-# ExpansiveMemoryBank
-# ---------------------------------------------------------------------------
-
-
-class ExpansiveMemoryBank:
-    """Five-tier expansive memory bank.
-
-    Manages the complete memory hierarchy:
-        ST (Session) -> MT (Project) -> LT (Core Identity)
-        + Episodic layer + Semantic layer
-
-    Provides consolidation pipelines that promote memories up
-    the hierarchy based on importance and recency.
+    Maintains a directed graph of parent-child relationships
+    and provides genealogical queries.
     """
 
     def __init__(self) -> None:
-        self.session = SessionMemory()
-        self.project = ProjectMemory()
-        self.core_identity = CoreIdentityMemory()
-        self.episodic = EpisodicMemory()
-        self.semantic = SemanticMemory()
-        self._consolidation_history: List[ConsolidationResult] = []
+        self._nodes: Dict[str, Dict[str, Any]] = {}
+        self._edges: List[Tuple[str, str]] = []
+        self._generation_map: Dict[str, int] = {}
 
-    def add_session_memory(self, content: str, source: str = "ingestion") -> None:
-        """Add a session-scoped memory."""
-        entry = SessionMemoryEntry(
-            content=content, source=source, session_id=str(uuid.uuid4())[:8]
-        )
-        self.session.add(entry)
-
-    def add_project_memory(self, content: str, project_id: str = "") -> None:
-        """Add a project-scoped memory."""
-        entry = ProjectMemoryEntry(content=content, project_id=project_id or "default")
-        self.project.add(entry)
-
-    def add_core_identity(self, content: str, category: str = "belief") -> None:
-        """Add a core identity memory."""
-        entry = CoreIdentityEntry(content=content, category=category)
-        self.core_identity.add(entry)
-
-    def add_episodic_memory(
-        self, content: str, event_type: str = "interaction", participants: Optional[List[str]] = None
+    def register_birth(
+        self,
+        child_id: str,
+        parent_ids: List[str],
+        generation: int,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Add an episodic memory."""
-        entry = EpisodicMemoryEntry(
-            content=content, event_type=event_type, participants=participants or []
-        )
-        self.episodic.add(entry)
+        """Register a new persona birth in the family tree.
 
-    def add_semantic_fact(self, subject: str, predicate: str, object: str, certainty: float = 1.0) -> None:
-        """Add a semantic fact."""
-        entry = SemanticMemoryEntry(
-            subject=subject, predicate=predicate, object=object, certainty=certainty
-        )
-        self.semantic.add(entry)
-
-    def consolidate(self) -> ConsolidationResult:
-        """Run memory consolidation pipeline.
-
-        Promotes important memories up the hierarchy:
-        - High-confidence session entries -> project memory
-        - Frequently accessed project entries -> core identity
-        - All tiers: prune expired entries
-
-        Returns:
-            ConsolidationResult with statistics.
+        Args:
+            child_id: New persona ID.
+            parent_ids: List of parent persona IDs.
+            generation: Generation number.
+            metadata: Optional metadata.
         """
-        result = ConsolidationResult()
-
-        # Prune expired entries from all tiers
-        result.pruned_entries += self.session.prune_expired()
-        result.pruned_entries += self.project.prune_expired()
-        result.pruned_entries += self.core_identity.prune_expired()
-
-        # Promote high-confidence session entries to project memory
-        for entry in self.session.entries:
-            if entry.confidence >= 0.8 and not entry.is_expired():
-                self.project.add(ProjectMemoryEntry(
-                    content=entry.content,
-                    project_id=entry.session_id,
-                    source=entry.source,
-                    confidence=entry.confidence,
-                ))
-                result.st_to_mt_entries += 1
-
-        # Promote frequently-accessed project entries to core identity
-        project_content_counts: Dict[str, int] = {}
-        for entry in self.project.entries:
-            project_content_counts[entry.content] = project_content_counts.get(entry.content, 0) + 1
-
-        for content, count in project_content_counts.items():
-            if count >= 3:
-                self.core_identity.add(CoreIdentityEntry(
-                    content=content, category="consolidated_belief"
-                ))
-                result.mt_to_lt_entries += 1
-
-        result.summary = (
-            f"Consolidation: {result.st_to_mt_entries} ST->MT, "
-            f"{result.mt_to_lt_entries} MT->LT, "
-            f"{result.pruned_entries} pruned"
-        )
-
-        self._consolidation_history.append(result)
-        logger.info(result.summary)
-        return result
-
-    def get_memory_summary(self) -> Dict[str, int]:
-        """Get summary of memory contents.
-
-        Returns:
-            Dict with entry counts per tier.
-        """
-        return {
-            "session": len(self.session.entries),
-            "project": len(self.project.entries),
-            "core_identity": len(self.core_identity.entries),
-            "episodic": len(self.episodic.entries),
-            "semantic": len(self.semantic.entries),
-            "total": (
-                len(self.session.entries) + len(self.project.entries) +
-                len(self.core_identity.entries) + len(self.episodic.entries) +
-                len(self.semantic.entries)
-            ),
+        self._nodes[child_id] = {
+            "id": child_id,
+            "parents": parent_ids,
+            "children": [],
+            "generation": generation,
+            "metadata": metadata or {},
         }
+        self._generation_map[child_id] = generation
 
-    def search_all(self, query: str) -> List[MemoryEntry]:
-        """Search all memory tiers for entries matching query.
+        for parent_id in parent_ids:
+            self._edges.append((parent_id, child_id))
+            if parent_id in self._nodes:
+                self._nodes[parent_id]["children"].append(child_id)
 
-        Args:
-            query: Search string.
-
-        Returns:
-            Matching entries from all tiers.
-        """
-        results: List[MemoryEntry] = []
-        query_lower = query.lower()
-
-        for entry in self.session.entries:
-            if query_lower in entry.content.lower():
-                results.append(entry)
-        for entry in self.project.entries:
-            if query_lower in entry.content.lower():
-                results.append(entry)
-        for entry in self.core_identity.entries:
-            if query_lower in entry.content.lower():
-                results.append(entry)
-        for entry in self.episodic.entries:
-            if query_lower in entry.content.lower():
-                results.append(entry)
-        for entry in self.semantic.entries:
-            if query_lower in entry.content.lower():
-                results.append(entry)
-
-        return results
-
-
-# ---------------------------------------------------------------------------
-# EntropicScript placeholder
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class EntropicScript:
-    """An entropic script for creative generation.
-
-    Attributes:
-        script_id: Unique identifier.
-        script_type: Type of script (e.g., "verse", "hook", "bridge").
-        entropy_level: Entropy level for variation (0.0-1.0).
-        template: Script template string.
-        constraints: Generation constraints.
-    """
-
-    script_id: str = ""
-    script_type: str = "verse"
-    entropy_level: float = 0.5
-    template: str = ""
-    constraints: Dict[str, Any] = field(default_factory=dict)
-
-
-# ---------------------------------------------------------------------------
-# GeneticPersona — Main class
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class GeneticPersona:
-    """Genetic Persona with Expansive Memory — GPXM Core.
-
-    Represents an artist persona with genetic evolution capabilities,
-    expansive 5-tier memory, voice differentiation parameters, and
-    entropic scripting.
-
-    Attributes:
-        persona_id: Unique persona identifier (auto-generated if empty).
-        artist_name: Primary artist name.
-        aliases: List of known aliases.
-        genre_anchor: Primary genre.
-        sub_genre_tags: Sub-genre classification tags.
-        era: Musical era (e.g., "2020s").
-        regional_origin: Geographic origin.
-        voice_params: VoiceDifferentiationParameters.
-        memory_bank: ExpansiveMemoryBank instance.
-        entropic_scripts: List of active EntropicScripts.
-        genetic_fitness: Current fitness score (0.0-1.0).
-        entropy_level: Entropy calibration (0.0-1.0).
-        collaboration_affinity: Collaboration preference (0.0-1.0).
-        evolution_generation: Number of evolution generations.
-        parent_ids: IDs of parent personas (if evolved).
-    """
-
-    persona_id: str = ""
-    artist_name: str = ""
-    aliases: List[str] = field(default_factory=list)
-    genre_anchor: str = ""
-    sub_genre_tags: List[str] = field(default_factory=list)
-    era: str = ""
-    regional_origin: str = ""
-    voice_params: VoiceDifferentiationParameters = field(default_factory=VoiceDifferentiationParameters)
-    memory_bank: ExpansiveMemoryBank = field(default_factory=ExpansiveMemoryBank)
-    entropic_scripts: List[EntropicScript] = field(default_factory=list)
-    genetic_fitness: float = 0.0
-    entropy_level: float = 0.5
-    collaboration_affinity: float = 0.5
-    evolution_generation: int = 0
-    parent_ids: List[str] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        """Auto-generate persona_id if not provided."""
-        if not self.persona_id:
-            self.persona_id = str(uuid.uuid4())[:12]
-
-    # -- Evolution operators --
-
-    def mutate(self, mutation_rate: float = 0.1) -> None:
-        """Apply mutation to this persona.
-
-        Randomly adjusts voice parameters and entropy level.
+    def get_ancestors(self, persona_id: str, depth: int = 3) -> List[str]:
+        """Get ancestors of a persona up to specified depth.
 
         Args:
-            mutation_rate: Probability of each trait mutating (0.0-1.0).
+            persona_id: Persona to query.
+            depth: Maximum ancestor depth.
+
+        Returns:
+            List of ancestor IDs.
         """
-        import random
+        ancestors = []
+        current_gen = [persona_id]
+        for _ in range(depth):
+            next_gen = []
+            for pid in current_gen:
+                node = self._nodes.get(pid)
+                if node:
+                    for parent in node["parents"]:
+                        if parent not in ancestors:
+                            ancestors.append(parent)
+                            next_gen.append(parent)
+            current_gen = next_gen
+            if not current_gen:
+                break
+        return ancestors
 
-        if random.random() < mutation_rate:
-            tiers = ["Street", "Mixed", "Literary", "Technical"]
-            self.voice_params.vocabulary_tier = random.choice(tiers)
-
-        if random.random() < mutation_rate:
-            densities = ["Low", "Medium", "High", "Very High"]
-            self.voice_params.slang_density = random.choice(densities)
-
-        if random.random() < mutation_rate:
-            self.entropy_level = max(0.0, min(1.0, self.entropy_level + random.gauss(0, 0.1)))
-
-        if random.random() < mutation_rate:
-            self.collaboration_affinity = max(0.0, min(1.0, self.collaboration_affinity + random.gauss(0, 0.1)))
-
-        self.evolution_generation += 1
-        logger.debug("Mutated %s (gen %d)", self.artist_name, self.evolution_generation)
-
-    def crossover(self, partner: GeneticPersona) -> GeneticPersona:
-        """Create offspring via crossover with another persona.
-
-        Blends voice parameters, takes entropic scripts from both,
-        and averages fitness-related traits.
+    def get_descendants(self, persona_id: str, depth: int = 3) -> List[str]:
+        """Get descendants of a persona up to specified depth.
 
         Args:
-            partner: The other parent persona.
+            persona_id: Persona to query.
+            depth: Maximum descendant depth.
 
         Returns:
-            New GeneticPersona offspring.
+            List of descendant IDs.
         """
-        import random
+        descendants = []
+        current_gen = [persona_id]
+        for _ in range(depth):
+            next_gen = []
+            for pid in current_gen:
+                node = self._nodes.get(pid)
+                if node:
+                    for child in node["children"]:
+                        if child not in descendants:
+                            descendants.append(child)
+                            next_gen.append(child)
+            current_gen = next_gen
+            if not current_gen:
+                break
+        return descendants
 
-        child = GeneticPersona(
-            artist_name=f"{self.artist_name}x{partner.artist_name}",
-            genre_anchor=self.genre_anchor if random.random() < 0.5 else partner.genre_anchor,
-            sub_genre_tags=list(set(self.sub_genre_tags + partner.sub_genre_tags)),
-            era=self.era if random.random() < 0.5 else partner.era,
-            regional_origin=self.regional_origin if random.random() < 0.5 else partner.regional_origin,
-            voice_params=self._blend_voice_params(partner),
-            memory_bank=ExpansiveMemoryBank(),
-            entropic_scripts=self.entropic_scripts + partner.entropic_scripts,
-            genetic_fitness=(self.genetic_fitness + partner.genetic_fitness) / 2.0,
-            entropy_level=(self.entropy_level + partner.entropy_level) / 2.0,
-            collaboration_affinity=(self.collaboration_affinity + partner.collaboration_affinity) / 2.0,
-            evolution_generation=max(self.evolution_generation, partner.evolution_generation) + 1,
-            parent_ids=[self.persona_id, partner.persona_id],
-        )
-
-        return child
-
-    def _blend_voice_params(self, partner: GeneticPersona) -> VoiceDifferentiationParameters:
-        """Blend voice parameters with a partner.
+    def get_siblings(self, persona_id: str) -> List[str]:
+        """Get siblings of a persona (same parents).
 
         Args:
-            partner: Partner persona.
+            persona_id: Persona to query.
 
         Returns:
-            Blended VoiceDifferentiationParameters.
+            List of sibling IDs.
         """
-        import random
+        node = self._nodes.get(persona_id)
+        if not node:
+            return []
 
-        s = self.voice_params
-        p = partner.voice_params
+        siblings = []
+        for parent in node["parents"]:
+            parent_node = self._nodes.get(parent)
+            if parent_node:
+                for child in parent_node["children"]:
+                    if child != persona_id and child not in siblings:
+                        siblings.append(child)
+        return siblings
 
-        return VoiceDifferentiationParameters(
-            vocabulary_tier=s.vocabulary_tier if random.random() < 0.5 else p.vocabulary_tier,
-            slang_density=s.slang_density if random.random() < 0.5 else p.slang_density,
-            sentence_length=s.sentence_length if random.random() < 0.5 else p.sentence_length,
-            pause_pattern=s.pause_pattern if random.random() < 0.5 else p.pause_pattern,
-            emotional_range=s.emotional_range if random.random() < 0.5 else p.emotional_range,
-            cultural_markers=s.cultural_markers if random.random() < 0.5 else p.cultural_markers,
-            narrative_mode=s.narrative_mode if random.random() < 0.5 else p.narrative_mode,
-            call_response=s.call_response if random.random() < 0.5 else p.call_response,
-        )
+    def get_generation(self, generation: int) -> List[str]:
+        """Get all persona IDs in a given generation.
 
-    def calculate_fitness(self) -> float:
-        """Calculate genetic fitness score.
-
-        Based on:
-        - Entropy level (optimal at 0.5)
-        - Collaboration affinity (higher = better)
-        - Memory richness
-        - Script diversity
+        Args:
+            generation: Generation number.
 
         Returns:
-            Fitness score (0.0-1.0).
+            List of persona IDs.
         """
-        entropy_score = 1.0 - abs(self.entropy_level - 0.5) * 2.0
-        collab_score = self.collaboration_affinity
-        memory_score = min(1.0, self.memory_bank.get_memory_summary()["total"] / 100.0)
-        script_score = min(1.0, len(self.entropic_scripts) / 5.0)
-
-        self.genetic_fitness = (entropy_score * 0.3 + collab_score * 0.3 +
-                                memory_score * 0.2 + script_score * 0.2)
-        return self.genetic_fitness
-
-    # -- Memory interface --
-
-    def remember_session(self, content: str, source: str = "ingestion") -> None:
-        """Add a session memory."""
-        self.memory_bank.add_session_memory(content, source)
-
-    def remember_project(self, content: str, project_id: str = "") -> None:
-        """Add a project memory."""
-        self.memory_bank.add_project_memory(content, project_id)
-
-    def remember_identity(self, content: str, category: str = "belief") -> None:
-        """Add a core identity memory."""
-        self.memory_bank.add_core_identity(content, category)
-
-    def remember_event(self, content: str, event_type: str = "interaction", participants: Optional[List[str]] = None) -> None:
-        """Add an episodic memory."""
-        self.memory_bank.add_episodic_memory(content, event_type, participants)
-
-    def remember_fact(self, subject: str, predicate: str, object: str, certainty: float = 1.0) -> None:
-        """Add a semantic fact."""
-        self.memory_bank.add_semantic_fact(subject, predicate, object, certainty)
-
-    def recall(self, query: str) -> List[MemoryEntry]:
-        """Search all memory tiers."""
-        return self.memory_bank.search_all(query)
-
-    def consolidate_memories(self) -> ConsolidationResult:
-        """Run memory consolidation."""
-        return self.memory_bank.consolidate()
-
-    # -- Script management --
-
-    def add_script(self, script: EntropicScript) -> None:
-        """Add an entropic script."""
-        self.entropic_scripts.append(script)
-
-    def get_scripts_by_type(self, script_type: str) -> List[EntropicScript]:
-        """Get scripts by type."""
-        return [s for s in self.entropic_scripts if s.script_type == script_type]
-
-    # -- Utility --
-
-    def clone(self) -> GeneticPersona:
-        """Create a deep copy of this persona."""
-        return deepcopy(self)
+        return [
+            pid for pid, gen in self._generation_map.items()
+            if gen == generation
+        ]
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
+        """Serialize tree to dictionary.
+
+        Returns:
+            Dictionary representation.
+        """
         return {
-            "persona_id": self.persona_id,
-            "artist_name": self.artist_name,
-            "aliases": self.aliases,
-            "genre_anchor": self.genre_anchor,
-            "sub_genre_tags": self.sub_genre_tags,
-            "era": self.era,
-            "regional_origin": self.regional_origin,
-            "voice_params": {
-                "vocabulary_tier": self.voice_params.vocabulary_tier,
-                "slang_density": self.voice_params.slang_density,
-                "emotional_range": self.voice_params.emotional_range,
-            },
-            "genetic_fitness": self.genetic_fitness,
-            "entropy_level": self.entropy_level,
-            "collaboration_affinity": self.collaboration_affinity,
-            "evolution_generation": self.evolution_generation,
-            "parent_ids": self.parent_ids,
-            "memory_summary": self.memory_bank.get_memory_summary(),
-            "script_count": len(self.entropic_scripts),
+            "nodes": self._nodes,
+            "edges": self._edges,
+            "generation_map": self._generation_map,
         }
 
-    def __repr__(self) -> str:
-        return (
-            f"GeneticPersona(id={self.persona_id[:8]}, "
-            f"name={self.artist_name}, "
-            f"fitness={self.genetic_fitness:.3f}, "
-            f"entropy={self.entropy_level:.3f})"
+
+# ---------------------------------------------------------------------------
+# GeneticPersona — Main builder class
+# ---------------------------------------------------------------------------
+
+
+class GeneticPersona:
+    """Genetic Persona builder for GART v3.0.
+
+    Creates and evolves artist DNA profiles through crossover,
+    mutation, and selection operations.
+
+    Attributes:
+        rng: Seeded random number generator.
+        twin_checker: Virtual-twin collision detector.
+        genealogy: Family tree tracking.
+        generation: Current generation counter.
+    """
+
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        similarity_threshold: float = 0.85,
+    ) -> None:
+        self.rng = random.Random(seed)
+        self.twin_checker = TwinDiffChecker(similarity_threshold)
+        self.genealogy = GenealogicalTree()
+        self.generation = 0
+        self._persona_counter = 0
+
+    # --- Persona creation ---
+
+    def create_founder(
+        self,
+        name: str,
+        skill_profile: Optional[Dict[GeneType, float]] = None,
+    ) -> ArtistDNA:
+        """Create a founder (generation 0) persona.
+
+        Args:
+            name: Persona display name.
+            skill_profile: Optional skill value overrides.
+
+        Returns:
+            New ArtistDNA for the founder.
+        """
+        self._persona_counter += 1
+        persona_id = f"{name}_G0_{self._persona_counter}"
+
+        genes: Dict[GeneType, SkillGene] = {}
+        for gene_type in GeneType:
+            base_value = skill_profile.get(gene_type, 0.5) if skill_profile else 0.5
+            genes[gene_type] = SkillGene(
+                gene_type=gene_type,
+                base_value=base_value,
+                dominance=self.rng.choice(list(GeneDominance)),
+                mutation_rate=self.rng.uniform(0.01, 0.1),
+                allele_variants=tuple(self.rng.uniform(0, 1) for _ in range(3)),
+            )
+
+        dna = ArtistDNA(
+            persona_id=persona_id,
+            generation=0,
+            genes=genes,
         )
 
+        self.genealogy.register_birth(
+            child_id=persona_id,
+            parent_ids=[],
+            generation=0,
+            metadata={"name": name, "type": "founder"},
+        )
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Genetic Persona module loaded successfully.")
+        return dna
 
-    # Create a persona
-    durk = GeneticPersona(
-        artist_name="Lil Durk",
-        aliases=["Durkio", "The Voice"],
-        genre_anchor="Hip-Hop",
-        sub_genre_tags=["melodic drill", "trap"],
-        era="2020s",
-        regional_origin="Chicago, IL",
-        voice_params=VoiceDifferentiationParameters(
-            vocabulary_tier="Street",
-            slang_density="High",
-            emotional_range="Extreme",
-            cultural_markers="Chicago drill culture",
-        ),
-        entropy_level=0.45,
-        collaboration_affinity=0.8,
-    )
+    def create_offspring(
+        self,
+        parent1: ArtistDNA,
+        parent2: ArtistDNA,
+        name: Optional[str] = None,
+    ) -> ArtistDNA:
+        """Create an offspring through genetic crossover.
 
-    # Add memories
-    durk.remember_session("Recorded 'All My Life' session", "session")
-    durk.remember_identity("Believes in loyalty above all", "value")
-    durk.remember_fact("Lil Durk", "origin", "Englewood, Chicago")
+        Args:
+            parent1: First parent DNA.
+            parent2: Second parent DNA.
+            name: Optional offspring name.
 
-    # Calculate fitness
-    fitness = durk.calculate_fitness()
-    print(f"\n{durk}")
-    print(f"Fitness: {fitness:.3f}")
-    print(f"Memory summary: {durk.memory_bank.get_memory_summary()}")
+        Returns:
+            New ArtistDNA for the offspring.
 
-    # Create offspring via crossover
-    baby = GeneticPersona(
-        artist_name="Lil Baby",
-        genre_anchor="Hip-Hop",
-        era="2020s",
-        regional_origin="Atlanta, GA",
-        voice_params=VoiceDifferentiationParameters(
-            vocabulary_tier="Street",
-            slang_density="High",
-        ),
-        entropy_level=0.5,
-        collaboration_affinity=0.9,
-    )
+        Raises:
+            CrossoverError: If parents are incompatible.
+        """
+        child_generation = max(parent1.generation, parent2.generation) + 1
+        self._persona_counter += 1
+        child_name = name or f"Offspring_{self._persona_counter}"
+        child_id = f"{child_name}_G{child_generation}_{self._persona_counter}"
 
-    child = durk.crossover(baby)
-    print(f"\nChild: {child}")
-    print(f"Parents: {child.parent_ids}")
+        # Crossover: inherit genes from both parents
+        child_genes = self._crossover(parent1, parent2)
+
+        # Apply mutations
+        mutated_genes, mutation_log = self._mutate(child_genes)
+
+        dna = ArtistDNA(
+            persona_id=child_id,
+            generation=child_generation,
+            parent_ids=(parent1.persona_id, parent2.persona_id),
+            genes=mutated_genes,
+            mutation_history=mutation_log,
+        )
+
+        self.genealogy.register_birth(
+            child_id=child_id,
+            parent_ids=[parent1.persona_id, parent2.persona_id],
+            generation=child_generation,
+            metadata={"name": child_name, "type": "offspring"},
+        )
+
+        return dna
+
+    def _crossover(
+        self,
+        parent1: ArtistDNA,
+        parent2: ArtistDNA,
+    ) -> Dict[GeneType, SkillGene]:
+        """Perform genetic crossover between two parents.
+
+        Args:
+            parent1: First parent DNA.
+            parent2: Second parent DNA.
+
+        Returns:
+            Child gene dictionary.
+
+        Raises:
+            CrossoverError: If crossover fails.
+        """
+        try:
+            child_genes: Dict[GeneType, SkillGene] = {}
+            all_genes = set(parent1.genes.keys()) | set(parent2.genes.keys())
+
+            for gene_type in all_genes:
+                g1 = parent1.genes.get(gene_type)
+                g2 = parent2.genes.get(gene_type)
+
+                if g1 and g2:
+                    # Both parents have gene — apply dominance rules
+                    if g1.dominance == GeneDominance.DOMINANT and g2.dominance != GeneDominance.DOMINANT:
+                        child_genes[gene_type] = g1
+                    elif g2.dominance == GeneDominance.DOMINANT and g1.dominance != GeneDominance.DOMINANT:
+                        child_genes[gene_type] = g2
+                    elif g1.dominance == GeneDominance.CODOMINANT or g2.dominance == GeneDominance.CODOMINANT:
+                        # Average both
+                        avg_value = (g1.base_value + g2.base_value) / 2
+                        child_genes[gene_type] = SkillGene(
+                            gene_type=gene_type,
+                            base_value=avg_value,
+                            dominance=GeneDominance.CODOMINANT,
+                            mutation_rate=(g1.mutation_rate + g2.mutation_rate) / 2,
+                        )
+                    else:
+                        # Random selection
+                        child_genes[gene_type] = self.rng.choice([g1, g2])
+                elif g1:
+                    child_genes[gene_type] = g1
+                elif g2:
+                    child_genes[gene_type] = g2
+
+            return child_genes
+
+        except Exception as e:
+            raise CrossoverError(f"Crossover failed: {e}")
+
+    def _mutate(
+        self,
+        genes: Dict[GeneType, SkillGene],
+    ) -> Tuple[Dict[GeneType, SkillGene], List[Dict[str, Any]]]:
+        """Apply random mutations to a gene set.
+
+        Args:
+            genes: Gene dictionary to mutate.
+
+        Returns:
+            Tuple of (mutated genes, mutation log).
+        """
+        mutated = dict(genes)
+        mutation_log: List[Dict[str, Any]] = []
+
+        for gene_type, gene in genes.items():
+            if self.rng.random() < gene.mutation_rate:
+                mutation_type = self.rng.choice(list(MutationType))
+                try:
+                    mutated_gene = gene.mutate(mutation_type, self.rng)
+                    mutated[gene_type] = mutated_gene
+                    mutation_log.append({
+                        "gene": gene_type.value,
+                        "type": mutation_type.value,
+                        "before": gene.base_value,
+                        "after": mutated_gene.base_value,
+                    })
+                except MutationError as e:
+                    logger.warning("Mutation failed for %s: %s", gene_type, e)
+
+        return mutated, mutation_log
+
+    # --- Selection and evolution ---
+
+    def select_best(
+        self,
+        population: List[ArtistDNA],
+        n: int = 2,
+    ) -> List[ArtistDNA]:
+        """Select the fittest individuals from a population.
+
+        Args:
+            population: List of DNA profiles.
+            n: Number to select.
+
+        Returns:
+            List of selected DNA profiles.
+        """
+        scored = [(dna, dna.get_overall_fitness()) for dna in population]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [dna for dna, _ in scored[:n]]
+
+    def evolve_generation(
+        self,
+        population: List[ArtistDNA],
+        offspring_count: int = 4,
+    ) -> List[ArtistDNA]:
+        """Evolve a new generation from the current population.
+
+        Args:
+            population: Current population.
+            offspring_count: Number of offspring to produce.
+
+        Returns:
+            List of new offspring DNA profiles.
+        """
+        if len(population) < 2:
+            return []
+
+        # Select parents
+        parents = self.select_best(population, n=min(4, len(population)))
+
+        offspring = []
+        for _ in range(offspring_count):
+            p1, p2 = self.rng.sample(parents, 2)
+            try:
+                child = self.create_offspring(p1, p2)
+                offspring.append(child)
+            except CrossoverError as e:
+                logger.warning("Offspring creation failed: %s", e)
+
+        self.generation += 1
+        return offspring
+
+    def check_twin_collision(
+        self,
+        dna1: ArtistDNA,
+        dna2: ArtistDNA,
+    ) -> Dict[str, Any]:
+        """Check for virtual-twin collision between two personas.
+
+        Args:
+            dna1: First DNA.
+            dna2: Second DNA.
+
+        Returns:
+            Collision report.
+        """
+        return self.twin_checker.check_collision(dna1, dna2)
+
+    def get_genealogy_report(self, persona_id: str) -> Dict[str, Any]:
+        """Get full genealogical report for a persona.
+
+        Args:
+            persona_id: Persona to query.
+
+        Returns:
+            Genealogy report dictionary.
+        """
+        return {
+            "persona_id": persona_id,
+            "ancestors": self.genealogy.get_ancestors(persona_id),
+            "descendants": self.genealogy.get_descendants(persona_id),
+            "siblings": self.genealogy.get_siblings(persona_id),
+        }

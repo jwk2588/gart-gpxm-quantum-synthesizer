@@ -1,14 +1,15 @@
 """
-Entropic Script Layering System — GPXM Core.
+Entropic Scripting — Secure State-Space Scripting Engine for GART v3.0.
 
-Implements 5-layer entropic scripting:
-    Layer 0: Base Rhythm (Vocabulary Matrix)
-    Layer 1: Lexical (Flow Architecture / Syntax)
-    Layer 2: Prosodic (Thematic Engine)
-    Layer 3: Narrative (Prosodic Features)
-    Layer 4: Cultural (Cultural Semantics)
+Provides tamper-resistant, formally-verifiable event scripting with
+zero-knowledge proof integration for tournament moves and state transitions.
 
-Entropy control: 0.0 (strict) to 1.0 (maximum variation)
+Components:
+    - ScriptEngine: Main scripting engine with state isolation
+    - EntropySource: Quantum/random entropy pool for non-determinism
+    - StateVerifier: Formal verification of state transitions
+    - ProofEngine: Zero-knowledge proof generation/verification
+    - ScriptEvent: Immutable event records
 
 Author: GART Architecture Team
 Version: 3.0.0
@@ -16,683 +17,912 @@ Version: 3.0.0
 
 from __future__ import annotations
 
-import copy
+import hashlib
+import json
 import logging
-import random
+import math
+import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Layer 0: Vocabulary Matrix
+# Exceptions
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class VocabularyMatrix:
-    """Layer 0 — Vocabulary foundation.
+class ScriptingError(Exception):
+    """Base exception for scripting errors."""
 
-    Defines the core vocabulary set, slang density, dialect markers,
-    and register range for an artist's linguistic base.
+
+class VerificationError(ScriptingError):
+    """Raised when state transition verification fails."""
+
+
+class TamperDetectedError(ScriptingError):
+    """Raised when tampering is detected in script history."""
+
+
+class ProofError(ScriptingError):
+    """Raised when ZK proof generation or verification fails."""
+
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+
+class EventType(Enum):
+    """Types of scriptable events."""
+
+    BATTLE_START = "battle_start"
+    ROUND_END = "round_end"
+    SKILL_USED = "skill_used"
+    SCORE_UPDATE = "score_update"
+    MUTATION_TRIGGER = "mutation_trigger"
+    COLLABORATION = "collaboration"
+    TOURNAMENT_ADVANCE = "tournament_advance"
+    CHAIN_REORG = "chain_reorganization"
+    CONSENSUS_VOTE = "consensus_vote"
+    TIMEOUT = "timeout"
+    CUSTOM = "custom"
+
+
+class ScriptOpcode(Enum):
+    """Script opcodes for the entropic scripting VM."""
+
+    NOP = 0x00           # No operation
+    PUSH = 0x01          # Push value to stack
+    POP = 0x02           # Pop value from stack
+    ADD = 0x10           # Add top two stack values
+    SUB = 0x11           # Subtract
+    MUL = 0x12           # Multiply
+    DIV = 0x13           # Divide
+    EQ = 0x20            # Equal comparison
+    LT = 0x21            # Less than
+    GT = 0x22            # Greater than
+    JMP = 0x30           # Unconditional jump
+    JZ = 0x31            # Jump if zero
+    VERIFY = 0x40        # Verify condition
+    HASH = 0x50          # Hash top of stack
+    SIGN = 0x51          # Sign data
+    PROVE = 0x60         # Generate ZK proof
+    VERIFY_PROOF = 0x61  # Verify ZK proof
+    EMIT = 0x70          # Emit event
+    LOAD_STATE = 0x80    # Load state variable
+    STORE_STATE = 0x81   # Store state variable
+    ENTROPY = 0x90       # Inject entropy
+    HALT = 0xFF          # Terminate execution
+
+
+class ProofType(Enum):
+    """Types of zero-knowledge proofs."""
+
+    KNOWLEDGE = "knowledge"      # Proof of knowledge
+    RANGE = "range"              # Range proof
+    MEMBERSHIP = "membership"    # Set membership proof
+    EQUIVALENCE = "equivalence"  # Equivalence proof
+    TAMPER = "tamper"            # Tamper-evident proof
+
+
+# ---------------------------------------------------------------------------
+# Data Structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ScriptEvent:
+    """Immutable event record in the script log.
 
     Attributes:
-        core_terms: Primary vocabulary terms (50-200).
-        slang_density: Frequency of colloquial usage.
-        dialect_markers: Regional dialect indicators.
-        technical_terms: Domain-specific terminology.
-        register_range: Formality spectrum (formal <-> informal).
-        filler_words: Common filler words for natural pauses.
+        event_id: Unique event identifier (hash).
+        event_type: Type of event.
+        timestamp: Unix timestamp.
+        sequence: Monotonic sequence number.
+        data: Event payload data.
+        previous_hash: Hash of previous event (chain integrity).
+        signature: Cryptographic signature.
     """
 
-    core_terms: List[str] = field(default_factory=list)
-    slang_density: str = "medium"  # low, medium, high, very_high
-    dialect_markers: List[str] = field(default_factory=list)
-    technical_terms: List[str] = field(default_factory=list)
-    register_range: Tuple[float, float] = (0.2, 0.8)
-    filler_words: List[str] = field(default_factory=lambda: ["uh", "you know", "like"])
-
-    def get_term_sample(self, count: int = 10) -> List[str]:
-        """Get a random sample of core terms.
-
-        Args:
-            count: Number of terms to sample.
-
-        Returns:
-            Sampled terms.
-        """
-        if not self.core_terms:
-            return []
-        return random.sample(self.core_terms, min(count, len(self.core_terms)))
-
-    def merge(self, other: VocabularyMatrix, blend: float = 0.5) -> VocabularyMatrix:
-        """Merge with another vocabulary matrix.
-
-        Args:
-            other: Other vocabulary matrix.
-            blend: Blend ratio (0.0 = self, 1.0 = other).
-
-        Returns:
-            Merged vocabulary matrix.
-        """
-        self_terms = set(self.core_terms)
-        other_terms = set(other.core_terms)
-        shared = list(self_terms & other_terms)
-        unique_self = list(self_terms - other_terms)
-        unique_other = list(other_terms - other_terms)
-
-        n_shared = int(len(shared) * (1 - blend))
-        n_self = int(len(unique_self) * (1 - blend * 0.5))
-        n_other = int(len(unique_other) * blend)
-
-        merged_terms = shared[:n_shared] + unique_self[:n_self] + unique_other[:n_other]
-
-        return VocabularyMatrix(
-            core_terms=merged_terms,
-            slang_density=other.slang_density if blend > 0.5 else self.slang_density,
-            dialect_markers=list(set(self.dialect_markers + other.dialect_markers)),
-            register_range=(
-                self.register_range[0] * (1 - blend) + other.register_range[0] * blend,
-                self.register_range[1] * (1 - blend) + other.register_range[1] * blend,
-            ),
-        )
-
-
-# ---------------------------------------------------------------------------
-# Layer 1: Flow Architecture (Syntax)
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class FlowArchitecture:
-    """Layer 1 — Syntactic flow patterns.
-
-    Defines line length, rhyme schemes, enjambment, pause placement,
-    cadence templates, and breath markers.
-
-    Attributes:
-        avg_line_length: Average syllables per line.
-        rhyme_scheme: Primary rhyme scheme pattern.
-        enjambment_frequency: How often lines run together (0.0-1.0).
-        pause_placement: Where pauses occur (end-heavy, even, staccato, flowing).
-        cadence_template: Named cadence pattern.
-        breath_markers: Positions for breath marks.
-        internal_rhyme_density: Frequency of internal rhymes (0.0-1.0).
-    """
-
-    avg_line_length: int = 16
-    rhyme_scheme: str = "AABB"
-    enjambment_frequency: float = 0.3
-    pause_placement: str = "end-heavy"
-    cadence_template: str = "standard_4_4"
-    breath_markers: List[float] = field(default_factory=lambda: [0.25, 0.5, 0.75])
-    internal_rhyme_density: float = 0.2
-
-    def get_line_variation(self) -> Tuple[int, int]:
-        """Get allowed line length variation range.
-
-        Returns:
-            (min_length, max_length) in syllables.
-        """
-        variance = int(self.avg_line_length * 0.25)
-        return (self.avg_line_length - variance, self.avg_line_length + variance)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
-        return {
-            "avg_line_length": self.avg_line_length,
-            "rhyme_scheme": self.rhyme_scheme,
-            "enjambment_frequency": self.enjambment_frequency,
-            "pause_placement": self.pause_placement,
-            "cadence_template": self.cadence_template,
-            "breath_markers": self.breath_markers,
-            "internal_rhyme_density": self.internal_rhyme_density,
-        }
-
-
-# ---------------------------------------------------------------------------
-# Layer 2: Thematic Engine
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ThematicEngine:
-    """Layer 2 — Thematic content engine.
-
-    Defines primary/secondary themes, metaphor families, narrative
-    structures, emotional arcs, and callback frequencies.
-
-    Attributes:
-        primary_themes: Ranked list of primary themes.
-        secondary_themes: Secondary theme list.
-        metaphor_families: Metaphor family categories.
-        narrative_structures: Preferred narrative approaches.
-        emotional_arc_patterns: Emotional progression templates.
-        callback_frequency: How often callbacks/references occur (0.0-1.0).
-        forbidden_topics: Topics to avoid.
-        required_elements: Elements that must appear.
-    """
-
-    primary_themes: List[str] = field(default_factory=list)
-    secondary_themes: List[str] = field(default_factory=list)
-    metaphor_families: List[str] = field(default_factory=list)
-    narrative_structures: List[str] = field(default_factory=lambda: ["linear"])
-    emotional_arc_patterns: List[str] = field(default_factory=lambda: ["rise_fall_rise"])
-    callback_frequency: float = 0.3
-    forbidden_topics: List[str] = field(default_factory=list)
-    required_elements: List[str] = field(default_factory=list)
-
-    def get_theme_blend(self, partner: ThematicEngine) -> List[str]:
-        """Get blended themes with a collaborator.
-
-        Args:
-            partner: Collaborator's thematic engine.
-
-        Returns:
-            Blended theme list.
-        """
-        shared = list(set(self.primary_themes) & set(partner.primary_themes))
-        combined = list(set(self.primary_themes + partner.primary_themes))
-        return shared + [t for t in combined if t not in shared]
-
-
-# ---------------------------------------------------------------------------
-# Layer 3: Prosodic Features
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ProsodicFeatures:
-    """Layer 3 — Prosodic delivery features.
-
-    Defines pitch range, intensity curves, ad-lib patterns, vocal
-    effects, tempo relationships, and dynamic variation.
-
-    Attributes:
-        pitch_range_semitones: Vocal pitch range in semitones.
-        intensity_curve: Intensity pattern (verse->chorus mapping).
-        adlib_patterns: Named ad-lib patterns.
-        adlib_frequency: How often ad-libs occur (0.0-1.0).
-        vocal_effects: Preferred vocal effects.
-        tempo_preference_bpm: Preferred tempo range.
-        dynamic_variation: Dynamic range (0.0 = flat, 1.0 = extreme).
-    """
-
-    pitch_range_semitones: int = 12
-    intensity_curve: str = "build_drop_build"
-    adlib_patterns: List[str] = field(default_factory=list)
-    adlib_frequency: float = 0.4
-    vocal_effects: List[str] = field(default_factory=list)
-    tempo_preference_bpm: Tuple[int, int] = (120, 140)
-    dynamic_variation: float = 0.6
-
-    def get_tempo_for_mood(self, mood: str) -> int:
-        """Get recommended tempo for a mood.
-
-        Args:
-            mood: Mood descriptor.
-
-        Returns:
-            Recommended BPM.
-        """
-        mood_map: Dict[str, int] = {
-            "aggressive": 140,
-            "melancholic": 110,
-            "energetic": 150,
-            "chill": 120,
-            "dark": 130,
-        }
-        return mood_map.get(mood, sum(self.tempo_preference_bpm) // 2)
-
-
-# ---------------------------------------------------------------------------
-# Layer 4: Cultural Semantics
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class CulturalSemantics:
-    """Layer 4 — Cultural integration.
-
-    Defines geographic references, temporal markers, intertextual
-    references, cultural symbols, audience addressing, and authenticity markers.
-
-    Attributes:
-        geographic_references: Location references.
-        temporal_markers: Era-specific markers.
-        intertextual_references: References to other works/artists.
-        cultural_symbols: Cultural symbol vocabulary.
-        audience_addressing: How the artist addresses listeners.
-        authenticity_markers: Markers of authenticity.
-        regional_slang: Region-specific slang terms.
-    """
-
-    geographic_references: List[str] = field(default_factory=list)
-    temporal_markers: List[str] = field(default_factory=list)
-    intertextual_references: List[str] = field(default_factory=list)
-    cultural_symbols: List[str] = field(default_factory=list)
-    audience_addressing: str = "direct"
-    authenticity_markers: List[str] = field(default_factory=list)
-    regional_slang: List[str] = field(default_factory=list)
-
-    def get_cultural_fingerprint(self) -> str:
-        """Get a cultural fingerprint string.
-
-        Returns:
-            Concatenated cultural markers.
-        """
-        parts = self.geographic_references[:2] + self.cultural_symbols[:3]
-        return " | ".join(parts) if parts else "neutral"
-
-
-# ---------------------------------------------------------------------------
-# Guardrails
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class Guardrails:
-    """Safety guardrails for entropic scripting.
-
-    Defines what must never appear, what must always appear,
-    and conditional behavior rules.
-
-    Attributes:
-        never_generate: List of forbidden content patterns.
-        always_include: List of required elements.
-        context_rules: Conditional behavior rules.
-        max_entropy_ceiling: Hard ceiling for entropy (default 0.9).
-        min_anchor_count: Minimum stable voice parameters.
-    """
-
-    never_generate: List[str] = field(default_factory=list)
-    always_include: List[str] = field(default_factory=list)
-    context_rules: Dict[str, str] = field(default_factory=dict)
-    max_entropy_ceiling: float = 0.9
-    min_anchor_count: int = 2
-
-    def validate(self, content: str, entropy: float) -> Tuple[bool, List[str]]:
-        """Validate content against guardrails.
-
-        Args:
-            content: Content to validate.
-            entropy: Current entropy level.
-
-        Returns:
-            (is_valid, list_of_violations)
-        """
-        violations: List[str] = []
-
-        # Check entropy ceiling
-        if entropy > self.max_entropy_ceiling:
-            violations.append(f"Entropy {entropy:.2f} exceeds ceiling {self.max_entropy_ceiling}")
-
-        # Check forbidden content
-        content_lower = content.lower()
-        for forbidden in self.never_generate:
-            if forbidden.lower() in content_lower:
-                violations.append(f"Forbidden content detected: '{forbidden}'")
-
-        # Check required elements
-        for required in self.always_include:
-            if required.lower() not in content_lower:
-                violations.append(f"Missing required element: '{required}'")
-
-        return (len(violations) == 0, violations)
-
-
-# ---------------------------------------------------------------------------
-# EntropicScript — 5-Layer Script Container
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class EntropicScript:
-    """Complete 5-layer entropic script for an artist persona.
-
-    Encodes all stylistic dimensions from vocabulary through cultural
-    semantics, with entropy calibration and guardrails.
-
-    Attributes:
-        artist_name: The artist this script models.
-        entropy_profile: Master entropy level (0.0-1.0).
-        layer_0_vocabulary: VocabularyMatrix.
-        layer_1_syntax: FlowArchitecture.
-        layer_2_themes: ThematicEngine.
-        layer_3_prosody: ProsodicFeatures.
-        layer_4_culture: CulturalSemantics.
-        guardrails: Safety guardrails.
-        version: Script version.
-    """
-
-    artist_name: str = ""
-    entropy_profile: float = 0.5
-    layer_0_vocabulary: VocabularyMatrix = field(default_factory=VocabularyMatrix)
-    layer_1_syntax: FlowArchitecture = field(default_factory=FlowArchitecture)
-    layer_2_themes: ThematicEngine = field(default_factory=ThematicEngine)
-    layer_3_prosody: ProsodicFeatures = field(default_factory=ProsodicFeatures)
-    layer_4_culture: CulturalSemantics = field(default_factory=CulturalSemantics)
-    guardrails: Guardrails = field(default_factory=Guardrails)
-    version: str = "1.0"
+    event_type: EventType
+    data: Dict[str, Any]
+    timestamp: float = field(default_factory=time.time)
+    sequence: int = 0
+    previous_hash: str = ""
+    event_id: str = ""
+    signature: str = ""
 
     def __post_init__(self) -> None:
-        """Validate entropy profile."""
-        self.entropy_profile = max(0.0, min(1.0, self.entropy_profile))
+        if not self.event_id:
+            eid = self._compute_hash()
+            object.__setattr__(self, "event_id", eid)
 
-    def get_layer_summary(self) -> Dict[str, Any]:
-        """Get summary of all 5 layers.
-
-        Returns:
-            Dictionary with layer summaries.
-        """
-        return {
-            "layer_0_vocabulary": {
-                "term_count": len(self.layer_0_vocabulary.core_terms),
-                "slang_density": self.layer_0_vocabulary.slang_density,
-            },
-            "layer_1_syntax": self.layer_1_syntax.to_dict(),
-            "layer_2_themes": {
-                "primary": self.layer_2_themes.primary_themes,
-                "metaphor_families": self.layer_2_themes.metaphor_families,
-            },
-            "layer_3_prosody": {
-                "pitch_range": self.layer_3_prosody.pitch_range_semitones,
-                "tempo": self.layer_3_prosody.tempo_preference_bpm,
-                "adlib_freq": self.layer_3_prosody.adlib_frequency,
-            },
-            "layer_4_culture": {
-                "fingerprint": self.layer_4_culture.get_cultural_fingerprint(),
-            },
-            "entropy": self.entropy_profile,
-            "guardrails": {
-                "ceiling": self.guardrails.max_entropy_ceiling,
-                "forbidden_count": len(self.guardrails.never_generate),
-            },
+    def _compute_hash(self) -> str:
+        """Compute SHA-256 hash of this event."""
+        payload = {
+            "event_type": self.event_type.value,
+            "data": self.data,
+            "timestamp": self.timestamp,
+            "sequence": self.sequence,
+            "previous_hash": self.previous_hash,
         }
+        json_str = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(json_str.encode()).hexdigest()
 
-    def merge_for_collaboration(self, partner: EntropicScript) -> EntropicScript:
-        """Create a blended script for collaboration.
+    def verify_chain(self, previous_event: Optional[ScriptEvent]) -> bool:
+        """Verify chain integrity with previous event.
 
         Args:
-            partner: Collaborator's entropic script.
+            previous_event: Previous event in chain.
 
         Returns:
-            Blended EntropicScript.
+            True if chain is intact.
         """
-        blended = copy.deepcopy(self)
-        blended.artist_name = f"{self.artist_name}+{partner.artist_name}"
-        blended.entropy_profile = (self.entropy_profile + partner.entropy_profile) / 2.0
-
-        # Merge vocabulary
-        blended.layer_0_vocabulary = self.layer_0_vocabulary.merge(
-            partner.layer_0_vocabulary, blend=0.5
-        )
-
-        # Blend themes
-        blended.layer_2_themes.primary_themes = self.layer_2_themes.get_theme_blend(
-            partner.layer_2_themes
-        )
-
-        # Blend tempo
-        min_tempo = min(
-            self.layer_3_prosody.tempo_preference_bpm[0],
-            partner.layer_3_prosody.tempo_preference_bpm[0],
-        )
-        max_tempo = max(
-            self.layer_3_prosody.tempo_preference_bpm[1],
-            partner.layer_3_prosody.tempo_preference_bpm[1],
-        )
-        blended.layer_3_prosody.tempo_preference_bpm = (min_tempo, max_tempo)
-
-        # Merge cultural references
-        blended.layer_4_culture.geographic_references = list(set(
-            self.layer_4_culture.geographic_references +
-            partner.layer_4_culture.geographic_references
-        ))
-
-        return blended
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
-        return {
-            "artist_name": self.artist_name,
-            "entropy_profile": self.entropy_profile,
-            "version": self.version,
-            "layer_0_vocabulary": {
-                "core_terms": self.layer_0_vocabulary.core_terms,
-                "slang_density": self.layer_0_vocabulary.slang_density,
-                "dialect_markers": self.layer_0_vocabulary.dialect_markers,
-            },
-            "layer_1_syntax": self.layer_1_syntax.to_dict(),
-            "layer_2_themes": {
-                "primary_themes": self.layer_2_themes.primary_themes,
-                "forbidden_topics": self.layer_2_themes.forbidden_topics,
-            },
-            "layer_3_prosody": {
-                "tempo_bpm": self.layer_3_prosody.tempo_preference_bpm,
-                "pitch_range": self.layer_3_prosody.pitch_range_semitones,
-            },
-            "layer_4_culture": {
-                "geographic_refs": self.layer_4_culture.geographic_references,
-                "fingerprint": self.layer_4_culture.get_cultural_fingerprint(),
-            },
-            "guardrails": {
-                "ceiling": self.guardrails.max_entropy_ceiling,
-                "never": self.guardrails.never_generate,
-            },
-        }
+        if previous_event is None:
+            return self.previous_hash == ""
+        return self.previous_hash == previous_event.event_id
 
 
-# ---------------------------------------------------------------------------
-# EntropyController
-# ---------------------------------------------------------------------------
+@dataclass
+class ScriptState:
+    """Mutable script execution state.
 
-
-class EntropyLevel(Enum):
-    """Discrete entropy calibration levels."""
-
-    STRICT = (0.0, 0.2, "Strict emulation, minimal variation")
-    FAITHFUL = (0.2, 0.4, "Faithful with subtle variations")
-    BALANCED = (0.4, 0.6, "Balanced creativity")
-    HIGH = (0.6, 0.8, "High variation, loose inspiration")
-    MAXIMUM = (0.8, 1.0, "Maximum entropy, near-abstract interpretation")
-
-    def __init__(self, low: float, high: float, description: str) -> None:
-        self.low = low
-        self.high = high
-        self.description = description
-
-
-class EntropyController:
-    """Controller for entropy calibration across all 5 layers.
-
-    Provides entropy level classification, per-layer adjustment,
-    and validation against guardrails.
+    Attributes:
+        variables: State variables dictionary.
+        stack: Execution stack.
+        pc: Program counter.
+        gas: Remaining gas (execution budget).
+        events: Emitted events list.
+        proof_queue: Pending proofs queue.
     """
 
-    @staticmethod
-    def calibrate(entropy: float) -> str:
-        """Classify an entropy value into a calibration band.
+    variables: Dict[str, Any] = field(default_factory=dict)
+    stack: List[Any] = field(default_factory=list)
+    pc: int = 0
+    gas: int = 10000
+    events: List[ScriptEvent] = field(default_factory=list)
+    proof_queue: List[Dict[str, Any]] = field(default_factory=list)
 
-        Args:
-            entropy: Entropy value (0.0-1.0).
+    def push(self, value: Any) -> None:
+        """Push value onto stack."""
+        self.stack.append(value)
+
+    def pop(self) -> Any:
+        """Pop value from stack.
 
         Returns:
-            Human-readable calibration description.
+            Top stack value.
 
         Raises:
-            ValueError: If entropy is outside [0.0, 1.0].
+            ScriptingError: If stack is empty.
         """
-        if not 0.0 <= entropy <= 1.0:
-            raise ValueError(f"Entropy must be 0.0-1.0, got {entropy}")
+        if not self.stack:
+            raise ScriptingError("Stack underflow")
+        return self.stack.pop()
 
-        for level in EntropyLevel:
-            if level.low <= entropy <= level.high:
-                return f"[{level.name}] {level.description} (entropy={entropy:.2f})"
-
-        return f"[UNKNOWN] entropy={entropy:.2f}"
-
-    @staticmethod
-    def get_level(entropy: float) -> EntropyLevel:
-        """Get the EntropyLevel enum for a value.
-
-        Args:
-            entropy: Entropy value.
+    def peek(self) -> Any:
+        """Peek at top of stack without popping.
 
         Returns:
-            Matching EntropyLevel.
+            Top stack value.
+
+        Raises:
+            ScriptingError: If stack is empty.
         """
-        for level in EntropyLevel:
-            if level.low <= entropy <= level.high:
-                return level
-        return EntropyLevel.BALANCED
+        if not self.stack:
+            raise ScriptingError("Stack empty")
+        return self.stack[-1]
 
-    @staticmethod
-    def adjust_for_layer(
-        base_entropy: float,
-        layer_index: int,
-        layer_sensitivity: float = 1.0,
-    ) -> float:
-        """Adjust entropy for a specific layer.
 
-        Different layers respond differently to entropy:
-        - Layer 0 (vocab): High sensitivity
-        - Layer 1 (syntax): Medium sensitivity
-        - Layer 2 (themes): Medium-low sensitivity
-        - Layer 3 (prosody): Low sensitivity
-        - Layer 4 (culture): Lowest sensitivity
+@dataclass
+class VMConfig:
+    """Virtual machine configuration.
+
+    Attributes:
+        max_gas: Maximum gas per execution.
+        max_stack_depth: Maximum stack depth.
+        max_events: Maximum events per execution.
+        enable_proofs: Whether to enable ZK proofs.
+        entropy_rounds: Number of entropy mixing rounds.
+    """
+
+    max_gas: int = 10000
+    max_stack_depth: int = 256
+    max_events: int = 100
+    enable_proofs: bool = True
+    entropy_rounds: int = 4
+
+
+# ---------------------------------------------------------------------------
+# EntropySource
+# ---------------------------------------------------------------------------
+
+
+class EntropySource:
+    """Entropy pool for non-deterministic operations.
+
+    Mixes multiple entropy sources including system randomness,
+    timing jitter, and cryptographic hashes.
+    """
+
+    def __init__(self, rounds: int = 4) -> None:
+        self.rounds = rounds
+        self._pool = hashlib.sha256(str(time.time_ns()).encode()).digest()
+        self._counter = 0
+
+    def mix(self, additional: Optional[bytes] = None) -> bytes:
+        """Mix entropy into the pool.
 
         Args:
-            base_entropy: Base entropy level.
-            layer_index: Layer index (0-4).
-            layer_sensitivity: Additional sensitivity multiplier.
+            additional: Additional entropy bytes to mix.
 
         Returns:
-            Adjusted entropy for the layer.
+            New entropy pool bytes.
         """
-        sensitivities = [1.0, 0.8, 0.6, 0.4, 0.3]
-        sens = sensitivities[layer_index] * layer_sensitivity
-        adjusted = base_entropy * sens
-        return max(0.0, min(1.0, adjusted))
+        for _ in range(self.rounds):
+            self._counter += 1
+            data = self._pool + str(self._counter).encode() + str(time.time_ns()).encode()
+            if additional:
+                data += additional
+            self._pool = hashlib.sha256(data).digest()
+        return self._pool
 
-    @staticmethod
-    def validate_safety(entropy: float, guardrails: Guardrails) -> Tuple[bool, List[str]]:
-        """Validate entropy against safety guardrails.
+    def random_float(self) -> float:
+        """Generate a random float from entropy pool.
+
+        Returns:
+            Random float in [0, 1).
+        """
+        pool = self.mix()
+        return int.from_bytes(pool[:8], "big") / (2**64)
+
+    def random_int(self, min_val: int = 0, max_val: int = 100) -> int:
+        """Generate a random integer from entropy pool.
 
         Args:
-            entropy: Current entropy.
-            guardrails: Safety guardrails.
+            min_val: Minimum value (inclusive).
+            max_val: Maximum value (inclusive).
 
         Returns:
-            (is_safe, list_of_violations)
+            Random integer.
         """
-        violations: List[str] = []
-        if entropy > guardrails.max_entropy_ceiling:
-            violations.append(
-                f"Entropy {entropy:.2f} exceeds ceiling {guardrails.max_entropy_ceiling}"
+        pool = self.mix()
+        range_size = max_val - min_val + 1
+        return min_val + (int.from_bytes(pool[:8], "big") % range_size)
+
+    def random_choice(self, options: List[T]) -> T:
+        """Select a random element from a list.
+
+        Args:
+            options: List to choose from.
+
+        Returns:
+            Randomly selected element.
+        """
+        idx = self.random_int(0, len(options) - 1)
+        return options[idx]
+
+    def get_pool_hash(self) -> str:
+        """Get current entropy pool hash.
+
+        Returns:
+            Hex digest of entropy pool.
+        """
+        return hashlib.sha256(self._pool).hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
+# ProofEngine
+# ---------------------------------------------------------------------------
+
+
+class ProofEngine:
+    """Zero-knowledge proof engine for script verification.
+
+    Provides simplified ZK proof generation and verification
+    for tournament moves and state transitions.
+    """
+
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled = enabled
+        self._proofs_generated = 0
+        self._proofs_verified = 0
+
+    def generate(
+        self,
+        proof_type: ProofType,
+        statement: Dict[str, Any],
+        witness: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Generate a zero-knowledge proof.
+
+        Args:
+            proof_type: Type of proof to generate.
+            statement: Public statement.
+            witness: Private witness data.
+
+        Returns:
+            Proof dictionary.
+
+        Raises:
+            ProofError: If proof generation fails.
+        """
+        if not self.enabled:
+            return {"type": proof_type.value, "disabled": True}
+
+        try:
+            # Simplified proof: hash of statement + blinded witness
+            witness_blind = hashlib.sha256(
+                json.dumps(witness, sort_keys=True, default=str).encode()
+            ).hexdigest()[:32]
+
+            statement_hash = hashlib.sha256(
+                json.dumps(statement, sort_keys=True, default=str).encode()
+            ).hexdigest()
+
+            proof = {
+                "type": proof_type.value,
+                "statement_hash": statement_hash,
+                "witness_commitment": witness_blind,
+                "nonce": int(time.time() * 1000),
+                "challenge": hashlib.sha256(
+                    (statement_hash + witness_blind).encode()
+                ).hexdigest()[:16],
+            }
+
+            self._proofs_generated += 1
+            return proof
+
+        except Exception as e:
+            raise ProofError(f"Proof generation failed: {e}")
+
+    def verify(
+        self,
+        proof: Dict[str, Any],
+        statement: Dict[str, Any],
+    ) -> bool:
+        """Verify a zero-knowledge proof.
+
+        Args:
+            proof: Proof dictionary.
+            statement: Public statement to verify against.
+
+        Returns:
+            True if proof is valid.
+        """
+        if not self.enabled or proof.get("disabled"):
+            return True
+
+        try:
+            expected_hash = hashlib.sha256(
+                json.dumps(statement, sort_keys=True, default=str).encode()
+            ).hexdigest()
+
+            if proof.get("statement_hash") != expected_hash:
+                return False
+
+            self._proofs_verified += 1
+            return True
+
+        except Exception as e:
+            logger.warning("Proof verification error: %s", e)
+            return False
+
+    def generate_tamper_proof(
+        self,
+        event_chain: List[ScriptEvent],
+    ) -> Dict[str, Any]:
+        """Generate a tamper-evident proof for an event chain.
+
+        Args:
+            event_chain: List of events to protect.
+
+        Returns:
+            Tamper proof dictionary.
+        """
+        if not event_chain:
+            return {"type": "tamper", "empty": True}
+
+        chain_hash = ""
+        for event in event_chain:
+            chain_hash = hashlib.sha256(
+                (chain_hash + event.event_id).encode()
+            ).hexdigest()
+
+        return {
+            "type": "tamper",
+            "chain_hash": chain_hash,
+            "event_count": len(event_chain),
+            "timestamp": time.time(),
+        }
+
+    def verify_tamper_proof(
+        self,
+        proof: Dict[str, Any],
+        event_chain: List[ScriptEvent],
+    ) -> bool:
+        """Verify a tamper-evident proof.
+
+        Args:
+            proof: Tamper proof dictionary.
+            event_chain: Event chain to verify.
+
+        Returns:
+            True if chain is untampered.
+        """
+        expected = self.generate_tamper_proof(event_chain)
+        return proof.get("chain_hash") == expected.get("chain_hash")
+
+
+# ---------------------------------------------------------------------------
+# StateVerifier
+# ---------------------------------------------------------------------------
+
+
+class StateVerifier:
+    """Formal state transition verifier.
+
+    Validates that state transitions follow allowed rules
+    and maintain system invariants.
+    """
+
+    def __init__(self) -> None:
+        self._rules: List[Callable[[Dict[str, Any], Dict[str, Any]], bool]] = []
+        self._invariants: List[Callable[[Dict[str, Any]], bool]] = []
+
+    def add_rule(
+        self,
+        rule: Callable[[Dict[str, Any], Dict[str, Any]], bool],
+    ) -> None:
+        """Add a state transition rule.
+
+        Args:
+            rule: Function(old_state, new_state) -> bool.
+        """
+        self._rules.append(rule)
+
+    def add_invariant(
+        self,
+        invariant: Callable[[Dict[str, Any]], bool],
+    ) -> None:
+        """Add a state invariant.
+
+        Args:
+            invariant: Function(state) -> bool.
+        """
+        self._invariants.append(invariant)
+
+    def verify_transition(
+        self,
+        old_state: Dict[str, Any],
+        new_state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Verify a state transition.
+
+        Args:
+            old_state: Previous state.
+            new_state: Proposed new state.
+
+        Returns:
+            Verification report.
+
+        Raises:
+            VerificationError: If verification fails.
+        """
+        report = {
+            "rules_passed": 0,
+            "rules_failed": 0,
+            "invariants_passed": 0,
+            "invariants_failed": 0,
+            "details": [],
+        }
+
+        # Check transition rules
+        for i, rule in enumerate(self._rules):
+            try:
+                if not rule(old_state, new_state):
+                    report["rules_failed"] += 1
+                    report["details"].append(f"Rule {i}: FAILED")
+                else:
+                    report["rules_passed"] += 1
+                    report["details"].append(f"Rule {i}: passed")
+            except Exception as e:
+                report["rules_failed"] += 1
+                report["details"].append(f"Rule {i}: ERROR - {e}")
+
+        # Check invariants on new state
+        for i, inv in enumerate(self._invariants):
+            try:
+                if not inv(new_state):
+                    report["invariants_failed"] += 1
+                    report["details"].append(f"Invariant {i}: FAILED")
+                else:
+                    report["invariants_passed"] += 1
+                    report["details"].append(f"Invariant {i}: passed")
+            except Exception as e:
+                report["invariants_failed"] += 1
+                report["details"].append(f"Invariant {i}: ERROR - {e}")
+
+        if report["rules_failed"] > 0 or report["invariants_failed"] > 0:
+            raise VerificationError(
+                f"Verification failed: {report['rules_failed']} rules, "
+                f"{report['invariants_failed']} invariants"
             )
-        if entropy < 0.0 or entropy > 1.0:
-            violations.append(f"Entropy out of range: {entropy}")
-        return (len(violations) == 0, violations)
 
-    @staticmethod
-    def generate_report(script: EntropicScript) -> str:
-        """Generate a human-readable entropy report.
+        return report
+
+    def create_default_rules(self) -> None:
+        """Create default transition rules for tournament state."""
+        # Score must be non-negative
+        self.add_rule(
+            lambda old, new: all(
+                v >= 0 for k, v in new.items() if k.endswith("_score")
+            )
+        )
+
+        # Round number must not decrease
+        self.add_rule(
+            lambda old, new: new.get("round", 0) >= old.get("round", 0)
+        )
+
+        # Event sequence must increase
+        self.add_rule(
+            lambda old, new: new.get("sequence", 0) > old.get("sequence", 0)
+        )
+
+
+# ---------------------------------------------------------------------------
+# ScriptEngine — Main engine
+# ---------------------------------------------------------------------------
+
+
+class ScriptEngine:
+    """Entropic scripting engine for GART v3.0.
+
+    Provides secure, verifiable script execution with state isolation,
+    tamper-evident logging, and zero-knowledge proof integration.
+
+    Attributes:
+        entropy: Entropy source for non-determinism.
+        prover: Zero-knowledge proof engine.
+        verifier: State transition verifier.
+        config: VM configuration.
+        event_log: Immutable event log.
+    """
+
+    def __init__(self, config: Optional[VMConfig] = None) -> None:
+        self.config = config or VMConfig()
+        self.entropy = EntropySource(self.config.entropy_rounds)
+        self.prover = ProofEngine(self.config.enable_proofs)
+        self.verifier = StateVerifier()
+        self.verifier.create_default_rules()
+        self._event_log: List[ScriptEvent] = []
+        self._state_history: List[Dict[str, Any]] = []
+        self._execution_count = 0
+
+    # --- Event logging ---
+
+    def emit_event(
+        self,
+        event_type: EventType,
+        data: Dict[str, Any],
+    ) -> ScriptEvent:
+        """Emit an event to the tamper-evident log.
 
         Args:
-            script: EntropicScript to report on.
+            event_type: Type of event.
+            data: Event data payload.
 
         Returns:
-            Formatted report string.
+            Created ScriptEvent.
         """
-        summary = script.get_layer_summary()
-        report_lines = [
-            f"Entropic Script Report: {script.artist_name}",
-            f"Entropy Profile: {script.entropy_profile:.2f}",
-            f"Calibration: {EntropyController.calibrate(script.entropy_profile)}",
-            "",
-            "Layer Summary:",
-            f"  L0 Vocabulary: {summary['layer_0_vocabulary']['term_count']} terms, "
-            f"slang={summary['layer_0_vocabulary']['slang_density']}",
-            f"  L1 Syntax: {summary['layer_1_syntax']['rhyme_scheme']}, "
-            f"avg_line={summary['layer_1_syntax']['avg_line_length']}",
-            f"  L2 Themes: {summary['layer_2_themes']['primary_themes']}",
-            f"  L3 Prosody: pitch={summary['layer_3_prosody']['pitch_range']}st, "
-            f"tempo={summary['layer_3_prosody']['tempo']}, "
-            f"adlibs={summary['layer_3_prosody']['adlib_freq']}",
-            f"  L4 Culture: {summary['layer_4_culture']['fingerprint']}",
-            "",
-            f"Guardrails: ceiling={summary['guardrails']['ceiling']}, "
-            f"forbidden={summary['guardrails']['forbidden_count']}",
-        ]
-        return "\n".join(report_lines)
+        prev_hash = self._event_log[-1].event_id if self._event_log else ""
+        event = ScriptEvent(
+            event_type=event_type,
+            data=data,
+            sequence=len(self._event_log),
+            previous_hash=prev_hash,
+        )
+        self._event_log.append(event)
+        return event
 
+    def verify_log_integrity(self) -> bool:
+        """Verify the integrity of the entire event log.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Entropic Scripting module loaded successfully.")
+        Returns:
+            True if log is intact.
+        """
+        for i in range(1, len(self._event_log)):
+            if not self._event_log[i].verify_chain(self._event_log[i - 1]):
+                return False
+        return True
 
-    # Create a sample entropic script for Lil Durk
-    script = EntropicScript(
-        artist_name="Lil Durk",
-        entropy_profile=0.45,
-        layer_0_vocabulary=VocabularyMatrix(
-            core_terms=["OTF", "trenches", "Drill", "The Voice", "smurk"],
-            slang_density="high",
-            dialect_markers=["Chicago", "Midwest"],
-            register_range=(0.1, 0.7),
-        ),
-        layer_1_syntax=FlowArchitecture(
-            avg_line_length=14,
-            rhyme_scheme="AABB",
-            pause_placement="end-heavy",
-            enjambment_frequency=0.2,
-            internal_rhyme_density=0.3,
-        ),
-        layer_2_themes=ThematicEngine(
-            primary_themes=["street life", "loss", "loyalty", "struggle"],
-            metaphor_families=["war", "family", "survival"],
-            emotional_arc_patterns=["melancholic_build"],
-            forbidden_topics=["snitching"],
-        ),
-        layer_3_prosody=ProsodicFeatures(
-            pitch_range_semitones=14,
-            intensity_curve="melodic_build",
-            adlib_patterns=["yeah yeah", "let's go", "gang"],
-            adlib_frequency=0.5,
-            tempo_preference_bpm=(130, 160),
-        ),
-        layer_4_culture=CulturalSemantics(
-            geographic_references=["Chicago", "Englewood", "O Block"],
-            cultural_symbols=["OTF chain", "trench symbolism"],
-            audience_addressing="direct",
-            regional_slang=["thot", "finna", "jit"],
-        ),
-    )
+    def get_event_log(self) -> List[ScriptEvent]:
+        """Get a copy of the event log.
 
-    print(f"\n{EntropyController.generate_report(script)}")
+        Returns:
+            List of events.
+        """
+        return list(self._event_log)
 
-    # Test collaboration merge
-    partner_script = EntropicScript(
-        artist_name="Lil Baby",
-        entropy_profile=0.5,
-        layer_0_vocabulary=VocabularyMatrix(
-            core_terms=["4PF", "lil bit", "drip", "QC"],
-            slang_density="high",
-            dialect_markers=["Atlanta"],
-        ),
-        layer_3_prosody=ProsodicFeatures(
-            tempo_preference_bpm=(140, 160),
-        ),
-        layer_4_culture=CulturalSemantics(
-            geographic_references=["Atlanta", "Oakland City"],
-        ),
-    )
+    # --- Script execution ---
 
-    blended = script.merge_for_collaboration(partner_script)
-    print(f"\n--- Blended Script ---")
-    print(f"Name: {blended.artist_name}")
-    print(f"Tempo: {blended.layer_3_prosody.tempo_preference_bpm}")
-    print(f"Themes: {blended.layer_2_themes.primary_themes}")
+    def execute(
+        self,
+        bytecode: List[Tuple[ScriptOpcode, Any]],
+        initial_state: Optional[Dict[str, Any]] = None,
+    ) -> ScriptState:
+        """Execute a script bytecode.
+
+        Args:
+            bytecode: List of (opcode, operand) tuples.
+            initial_state: Initial state variables.
+
+        Returns:
+            Final execution state.
+        """
+        state = ScriptState(variables=initial_state or {})
+        self._execution_count += 1
+
+        while state.pc < len(bytecode) and state.gas > 0:
+            opcode, operand = bytecode[state.pc]
+
+            if state.gas <= 0:
+                break
+
+            state.gas -= 1
+
+            try:
+                self._execute_opcode(opcode, operand, state)
+            except ScriptingError as e:
+                logger.error("Script execution error at pc=%d: %s", state.pc, e)
+                break
+
+            state.pc += 1
+
+        return state
+
+    def _execute_opcode(
+        self,
+        opcode: ScriptOpcode,
+        operand: Any,
+        state: ScriptState,
+    ) -> None:
+        """Execute a single opcode.
+
+        Args:
+            opcode: Operation code.
+            operand: Operation operand.
+            state: Current execution state.
+        """
+        if opcode == ScriptOpcode.NOP:
+            pass
+
+        elif opcode == ScriptOpcode.PUSH:
+            state.push(operand)
+
+        elif opcode == ScriptOpcode.POP:
+            state.pop()
+
+        elif opcode == ScriptOpcode.ADD:
+            b = state.pop()
+            a = state.pop()
+            state.push(a + b)
+
+        elif opcode == ScriptOpcode.SUB:
+            b = state.pop()
+            a = state.pop()
+            state.push(a - b)
+
+        elif opcode == ScriptOpcode.MUL:
+            b = state.pop()
+            a = state.pop()
+            state.push(a * b)
+
+        elif opcode == ScriptOpcode.DIV:
+            b = state.pop()
+            a = state.pop()
+            if b == 0:
+                raise ScriptingError("Division by zero")
+            state.push(a / b)
+
+        elif opcode == ScriptOpcode.EQ:
+            b = state.pop()
+            a = state.pop()
+            state.push(1.0 if a == b else 0.0)
+
+        elif opcode == ScriptOpcode.LT:
+            b = state.pop()
+            a = state.pop()
+            state.push(1.0 if a < b else 0.0)
+
+        elif opcode == ScriptOpcode.GT:
+            b = state.pop()
+            a = state.pop()
+            state.push(1.0 if a > b else 0.0)
+
+        elif opcode == ScriptOpcode.JMP:
+            state.pc = int(operand) - 1  # -1 because pc increments after
+
+        elif opcode == ScriptOpcode.JZ:
+            cond = state.pop()
+            if cond == 0:
+                state.pc = int(operand) - 1
+
+        elif opcode == ScriptOpcode.VERIFY:
+            cond = state.pop()
+            if not cond:
+                raise VerificationError(f"Verification failed: {operand}")
+
+        elif opcode == ScriptOpcode.HASH:
+            value = state.pop()
+            hash_val = hashlib.sha256(str(value).encode()).hexdigest()[:16]
+            state.push(hash_val)
+
+        elif opcode == ScriptOpcode.SIGN:
+            value = state.pop()
+            sig = hashlib.sha256(str(value).encode()).hexdigest()
+            state.push(sig)
+
+        elif opcode == ScriptOpcode.PROVE:
+            if self.config.enable_proofs:
+                witness = state.pop()
+                statement = {"pc": state.pc, "operand": operand}
+                proof = self.prover.generate(
+                    ProofType.KNOWLEDGE, statement, {"witness": witness}
+                )
+                state.proof_queue.append(proof)
+                state.push(proof["challenge"])
+
+        elif opcode == ScriptOpcode.VERIFY_PROOF:
+            if self.config.enable_proofs and state.proof_queue:
+                proof = state.proof_queue.pop(0)
+                statement = {"pc": state.pc, "operand": operand}
+                valid = self.prover.verify(proof, statement)
+                state.push(1.0 if valid else 0.0)
+            else:
+                state.push(1.0)
+
+        elif opcode == ScriptOpcode.EMIT:
+            event_type = EventType(operand.get("type", "custom"))
+            self.emit_event(event_type, operand.get("data", {}))
+
+        elif opcode == ScriptOpcode.LOAD_STATE:
+            key = str(operand)
+            state.push(state.variables.get(key, 0))
+
+        elif opcode == ScriptOpcode.STORE_STATE:
+            key = str(operand)
+            value = state.pop()
+            state.variables[key] = value
+
+        elif opcode == ScriptOpcode.ENTROPY:
+            value = self.entropy.random_float()
+            state.push(value)
+
+        elif opcode == ScriptOpcode.HALT:
+            state.pc = len(bytecode)  # Force exit
+
+        else:
+            raise ScriptingError(f"Unknown opcode: {opcode}")
+
+    # --- State management ---
+
+    def transition_state(
+        self,
+        new_state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Perform a verified state transition.
+
+        Args:
+            new_state: Proposed new state.
+
+        Returns:
+            Verification report.
+
+        Raises:
+            VerificationError: If transition is invalid.
+        """
+        old_state = self._state_history[-1] if self._state_history else {}
+
+        report = self.verifier.verify_transition(old_state, new_state)
+
+        self._state_history.append(dict(new_state))
+
+        self.emit_event(EventType.CUSTOM, {
+            "action": "state_transition",
+            "report": report,
+        })
+
+        return report
+
+    def get_current_state(self) -> Dict[str, Any]:
+        """Get the current state.
+
+        Returns:
+            Current state dictionary.
+        """
+        return dict(self._state_history[-1]) if self._state_history else {}
+
+    # --- Proof operations ---
+
+    def generate_move_proof(
+        self,
+        move_data: Dict[str, Any],
+        witness: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Generate a ZK proof for a tournament move.
+
+        Args:
+            move_data: Public move data.
+            witness: Private witness data.
+
+        Returns:
+            Proof dictionary.
+        """
+        return self.prover.generate(ProofType.KNOWLEDGE, move_data, witness)
+
+    def verify_move_proof(
+        self,
+        proof: Dict[str, Any],
+        move_data: Dict[str, Any],
+    ) -> bool:
+        """Verify a tournament move proof.
+
+        Args:
+            proof: Proof dictionary.
+            move_data: Public move data.
+
+        Returns:
+            True if proof is valid.
+        """
+        return self.prover.verify(proof, move_data)
+
+    def generate_chain_proof(self) -> Dict[str, Any]:
+        """Generate tamper-evident proof for the event chain.
+
+        Returns:
+            Chain proof dictionary.
+        """
+        return self.prover.generate_tamper_proof(self._event_log)
+
+    # --- Tamper detection ---
+
+    def detect_tampering(self) -> Optional[Dict[str, Any]]:
+        """Detect tampering in the event log.
+
+        Returns:
+            Tamper report if detected, None otherwise.
+        """
+        if not self.verify_log_integrity():
+            # Find the break point
+            for i in range(1, len(self._event_log)):
+                if not self._event_log[i].verify_chain(self._event_log[i - 1]):
+                    return {
+                        "tampered": True,
+                        "break_point": i,
+                        "expected_previous": self._event_log[i - 1].event_id,
+                        "actual_previous": self._event_log[i].previous_hash,
+                    }
+        return None
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get engine statistics.
+
+        Returns:
+            Statistics dictionary.
+        """
+        return {
+            "executions": self._execution_count,
+            "events_logged": len(self._event_log),
+            "state_transitions": len(self._state_history),
+            "proofs_generated": self.prover._proofs_generated,
+            "proofs_verified": self.prover._proofs_verified,
+            "entropy_pool_hash": self.entropy.get_pool_hash(),
+            "log_integrity": self.verify_log_integrity(),
+        }

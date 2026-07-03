@@ -1,12 +1,15 @@
 """
-16-Slot Capped Artist Roster Manager — GPXM.
+Roster Manager — Persona Roster & Family-Tree Tracking for GART v3.0.
 
-Manages the artist pool with:
-    - 16-slot mechanical cap
-    - Non-redundancy filtering
-    - Taxonomy packaging
-    - Collaboration matrix computation
-    - Cosine-similarity-based compatibility scoring
+Manages persona registration, genealogical queries, and roster
+persistence with JSON import/export.
+
+Components:
+    - RosterEntry: Individual roster record
+    - RosterManager: Main roster with CRUD + genealogy
+    - RosterQuery: Query DSL for roster searches
+    - RosterIO: JSON import/export
+    - RosterValidator: Integrity validation
 
 Author: GART Architecture Team
 Version: 3.0.0
@@ -14,137 +17,208 @@ Version: 3.0.0
 
 from __future__ import annotations
 
+import json
 import logging
-import math
-from dataclasses import dataclass, field
+import re
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Forward reference / local import shim
+# Exceptions
 # ---------------------------------------------------------------------------
 
 
-def _get_genetic_persona_class():
-    """Lazy import to avoid circular dependencies."""
-    try:
-        from .genetic_persona import GeneticPersona, VoiceDifferentiationParameters
-        return GeneticPersona, VoiceDifferentiationParameters
-    except ImportError:
-        # Fallback for standalone usage
-        from dataclasses import dataclass as dc, field as f
+class RosterError(Exception):
+    """Base exception for roster operations."""
 
-        @dc
-        class VoiceDifferentiationParameters:  # type: ignore[no-redef]
-            vocabulary_tier: str = "Mixed"
-            slang_density: str = "Medium"
-            emotional_range: str = "Wide"
-            cultural_markers: str = ""
-            narrative_mode: str = "Linear"
 
-        @dc
-        class GeneticPersona:  # type: ignore[no-redef]
-            persona_id: str = ""
-            artist_name: str = "Unknown"
-            aliases: List[str] = f(default_factory=list)
-            genre_anchor: str = ""
-            sub_genre_tags: List[str] = f(default_factory=list)
-            era: str = ""
-            regional_origin: str = ""
-            voice_params: Any = f(default_factory=VoiceDifferentiationParameters)
-            entropic_scripts: List[Any] = f(default_factory=list)
-            entropy_level: float = 0.5
-            collaboration_affinity: float = 0.5
+class DuplicateEntryError(RosterError):
+    """Raised when adding a persona that already exists."""
 
-        return GeneticPersona, VoiceDifferentiationParameters
+
+class EntryNotFoundError(RosterError):
+    """Raised when a requested entry is not found."""
+
+
+class ValidationError(RosterError):
+    """Raised when roster validation fails."""
 
 
 # ---------------------------------------------------------------------------
-# Stylistic Signature Extractor
+# Enums
 # ---------------------------------------------------------------------------
 
 
-def _extract_signature_vector(persona: Any) -> List[float]:
-    """Extract a numeric signature vector from a persona.
+class PersonaStatus(Enum):
+    """Status of a persona in the roster."""
 
-    Creates a feature vector from voice params, genre, era, and
-    entropy for cosine similarity computation.
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    RETIRED = "retired"
+    BANNED = "banned"
+    PENDING = "pending"
+    SUSPENDED = "suspended"
 
-    Args:
-        persona: GeneticPersona object.
 
-    Returns:
-        Numeric feature vector.
+class PersonaTier(Enum):
+    """Tier/classification of a persona."""
+
+    FOUNDER = "founder"
+    CHAMPION = "champion"
+    CONTENDER = "contender"
+    PROSPECT = "prospect"
+    LEGEND = "legend"
+
+
+# ---------------------------------------------------------------------------
+# Data Structures
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RosterEntry:
+    """A single persona entry in the roster.
+
+    Attributes:
+        persona_id: Unique identifier.
+        artist_name: Display name.
+        status: Current status.
+        tier: Classification tier.
+        generation: Genealogical generation.
+        parent_ids: Parent persona IDs.
+        child_ids: Child persona IDs.
+        skills: Skill ratings dictionary.
+        metadata: Free-form metadata.
+        created_at: Creation timestamp.
+        updated_at: Last update timestamp.
     """
-    voice = getattr(persona, "voice_params", None)
-    if voice is None:
-        return [0.5] * 10
 
-    # Encode categorical features as numeric values
-    vocab_map = {"Street": 0.0, "Mixed": 0.33, "Literary": 0.66, "Technical": 1.0}
-    slang_map = {"Low": 0.0, "Medium": 0.33, "High": 0.66, "Very High": 1.0}
-    emotion_map = {"Narrow": 0.0, "Medium": 0.33, "Wide": 0.66, "Extreme": 1.0}
-    narrative_map = {"Linear": 0.0, "Fragmented": 0.33, "Abstract": 0.66, "Cinematic": 1.0}
+    persona_id: str
+    artist_name: str
+    status: PersonaStatus = PersonaStatus.ACTIVE
+    tier: PersonaTier = PersonaTier.PROSPECT
+    generation: int = 0
+    parent_ids: List[str] = field(default_factory=list)
+    child_ids: List[str] = field(default_factory=list)
+    skills: Dict[str, float] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    vector = [
-        vocab_map.get(getattr(voice, "vocabulary_tier", "Mixed"), 0.33),
-        slang_map.get(getattr(voice, "slang_density", "Medium"), 0.33),
-        emotion_map.get(getattr(voice, "emotional_range", "Wide"), 0.66),
-        narrative_map.get(getattr(voice, "narrative_mode", "Linear"), 0.0),
-        getattr(persona, "entropy_level", 0.5),
-        getattr(persona, "collaboration_affinity", 0.5),
-        # Genre encoding (hash to float)
-        hash(getattr(persona, "genre_anchor", "")) % 1000 / 1000.0,
-        # Era encoding
-        _era_to_float(getattr(persona, "era", "2020s")),
-        # Regional encoding
-        hash(getattr(persona, "regional_origin", "")) % 1000 / 1000.0,
-        len(getattr(persona, "sub_genre_tags", [])) / 10.0,
-    ]
-    return vector
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize entry to dictionary.
+
+        Returns:
+            Dictionary representation.
+        """
+        return {
+            "persona_id": self.persona_id,
+            "artist_name": self.artist_name,
+            "status": self.status.value,
+            "tier": self.tier.value,
+            "generation": self.generation,
+            "parent_ids": list(self.parent_ids),
+            "child_ids": list(self.child_ids),
+            "skills": dict(self.skills),
+            "metadata": dict(self.metadata),
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RosterEntry:
+        """Deserialize entry from dictionary.
+
+        Args:
+            data: Dictionary representation.
+
+        Returns:
+            RosterEntry instance.
+        """
+        return cls(
+            persona_id=data["persona_id"],
+            artist_name=data["artist_name"],
+            status=PersonaStatus(data.get("status", "active")),
+            tier=PersonaTier(data.get("tier", "prospect")),
+            generation=data.get("generation", 0),
+            parent_ids=list(data.get("parent_ids", [])),
+            child_ids=list(data.get("child_ids", [])),
+            skills=dict(data.get("skills", {})),
+            metadata=dict(data.get("metadata", {})),
+            created_at=data.get("created_at", datetime.now().isoformat()),
+            updated_at=data.get("updated_at", datetime.now().isoformat()),
+        )
+
+    def add_child(self, child_id: str) -> None:
+        """Add a child reference.
+
+        Args:
+            child_id: Child persona ID.
+        """
+        if child_id not in self.child_ids:
+            self.child_ids.append(child_id)
+            self.updated_at = datetime.now().isoformat()
+
+    def add_parent(self, parent_id: str) -> None:
+        """Add a parent reference.
+
+        Args:
+            parent_id: Parent persona ID.
+        """
+        if parent_id not in self.parent_ids:
+            self.parent_ids.append(parent_id)
+            self.updated_at = datetime.now().isoformat()
+
+    def update_skill(self, skill_name: str, value: float) -> None:
+        """Update a skill rating.
+
+        Args:
+            skill_name: Skill name.
+            value: Skill value (0.0-1.0).
+        """
+        self.skills[skill_name] = max(0.0, min(1.0, value))
+        self.updated_at = datetime.now().isoformat()
+
+    @property
+    def overall_rating(self) -> float:
+        """Compute overall skill rating.
+
+        Returns:
+            Average of all skill values.
+        """
+        if not self.skills:
+            return 0.0
+        return sum(self.skills.values()) / len(self.skills)
 
 
-def _era_to_float(era: str) -> float:
-    """Convert era string to numeric value.
+@dataclass
+class RosterQuery:
+    """Query specification for roster searches.
 
-    Args:
-        era: Era string (e.g., "1990s", "2020s").
-
-    Returns:
-        Numeric era value (0.0-1.0).
+    Attributes:
+        filters: Field filters as dict of field -> value.
+        skill_min: Minimum overall skill rating.
+        skill_max: Maximum overall skill rating.
+        generations: List of generation numbers.
+        tiers: List of tier values.
+        statuses: List of status values.
+        limit: Maximum results.
+        offset: Result offset.
     """
-    era_map = {
-        "1980s": 0.0, "1990s": 0.2, "2000s": 0.4,
-        "2010s": 0.6, "2020s": 0.8, "2030s": 1.0,
-    }
-    return era_map.get(era, 0.5)
 
-
-def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
-    """Compute cosine similarity between two vectors.
-
-    Args:
-        vec_a: First vector.
-        vec_b: Second vector.
-
-    Returns:
-        Cosine similarity (-1.0 to 1.0).
-    """
-    if len(vec_a) != len(vec_b):
-        min_len = min(len(vec_a), len(vec_b))
-        vec_a = vec_a[:min_len]
-        vec_b = vec_b[:min_len]
-
-    dot = sum(a * b for a, b in zip(vec_a, vec_b))
-    norm_a = math.sqrt(sum(a * a for a in vec_a))
-    norm_b = math.sqrt(sum(b * b for b in vec_b))
-
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-
-    return dot / (norm_a * norm_b)
+    filters: Dict[str, Any] = field(default_factory=dict)
+    skill_min: Optional[float] = None
+    skill_max: Optional[float] = None
+    generations: Optional[List[int]] = None
+    tiers: Optional[List[PersonaTier]] = None
+    statuses: Optional[List[PersonaStatus]] = None
+    limit: int = 100
+    offset: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -152,496 +226,553 @@ def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
 # ---------------------------------------------------------------------------
 
 
-class RosterError(Exception):
-    """Custom exception for roster operations."""
-
-    pass
-
-
-class RosterFullError(RosterError):
-    """Raised when roster is at capacity."""
-
-    pass
-
-
-class DuplicateArtistError(RosterError):
-    """Raised when adding a duplicate artist."""
-
-    pass
-
-
-@dataclass
-class SlotInfo:
-    """Information about a roster slot.
-
-    Attributes:
-        slot_index: Slot number (0-15).
-        persona: The GeneticPersona in this slot (None if empty).
-        status: Slot status.
-        date_added: When the persona was added.
-    """
-
-    slot_index: int
-    persona: Optional[Any] = None
-    status: str = "empty"
-    date_added: Optional[str] = None
-
-
 class RosterManager:
-    """16-Slot Capped Artist Roster Manager.
+    """Persona roster manager for GART v3.0.
 
-    Manages a fixed-size pool of GeneticPersona objects with
-    mechanical filtering, taxonomy packaging, and collaboration scoring.
+    Provides CRUD operations for persona entries, genealogical
+    queries, and roster persistence.
 
     Attributes:
-        MAX_SLOTS: Maximum number of roster slots (16).
+        entries: Dictionary of persona_id -> RosterEntry.
+        _id_counter: Internal ID counter.
     """
-
-    MAX_SLOTS: int = 16
 
     def __init__(self) -> None:
-        self.slots: Dict[int, Optional[Any]] = {i: None for i in range(self.MAX_SLOTS)}
-        self._slot_metadata: Dict[int, Dict[str, Any]] = {
-            i: {} for i in range(self.MAX_SLOTS)
-        }
-        self.collaboration_matrix: Dict[Tuple[str, str], float] = {}
-        self._collaboration_history: List[Tuple[str, str, float]] = []
+        self._entries: Dict[str, RosterEntry] = {}
+        self._id_counter = 0
 
-    # ------------------------------------------------------------------
-    # Slot management
-    # ------------------------------------------------------------------
+    # --- CRUD operations ---
 
-    def add_artist(self, persona: Any) -> int:
-        """Add an artist persona to the roster.
-
-        Finds the first empty slot, validates against redundancy,
-        and assigns the persona.
+    def create(
+        self,
+        artist_name: str,
+        persona_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> RosterEntry:
+        """Create a new roster entry.
 
         Args:
-            persona: GeneticPersona to add.
+            artist_name: Display name for the persona.
+            persona_id: Optional explicit ID (auto-generated if None).
+            **kwargs: Additional entry attributes.
 
         Returns:
-            Slot index where the persona was placed.
+            Created RosterEntry.
 
         Raises:
-            RosterFullError: If all 16 slots are occupied.
-            DuplicateArtistError: If a similar persona already exists.
+            DuplicateEntryError: If persona_id already exists.
         """
-        # Check for duplicates (mechanical filtering)
-        if self._is_duplicate(persona):
-            existing = self._find_similar(persona)
-            raise DuplicateArtistError(
-                f"Similar artist already in roster: {existing}"
-            )
+        if persona_id is None:
+            self._id_counter += 1
+            persona_id = f"{artist_name.replace(' ', '_')}_{self._id_counter}"
 
-        # Find empty slot
-        empty_slot = self._find_empty_slot()
-        if empty_slot is None:
-            raise RosterFullError(
-                f"Roster is full (max {self.MAX_SLOTS} slots). "
-                "Remove an artist before adding a new one."
-            )
+        if persona_id in self._entries:
+            raise DuplicateEntryError(f"Persona '{persona_id}' already exists")
 
-        self.slots[empty_slot] = persona
-        self._slot_metadata[empty_slot] = {
-            "date_added": str(__import__("datetime").datetime.now()),
-            "artist_name": getattr(persona, "artist_name", "Unknown"),
-        }
-
-        # Recalculate collaboration matrix for new artist
-        self._update_collaboration_for_artist(persona)
-
-        logger.info(
-            "Added %s to slot %d",
-            getattr(persona, "artist_name", "Unknown"), empty_slot,
+        entry = RosterEntry(
+            persona_id=persona_id,
+            artist_name=artist_name,
+            **kwargs,
         )
-        return empty_slot
+        self._entries[persona_id] = entry
+        logger.info("Created roster entry: %s (%s)", persona_id, artist_name)
+        return entry
 
-    def remove_artist(self, slot_index: int) -> Any:
-        """Remove an artist from a slot.
+    def get(self, persona_id: str) -> RosterEntry:
+        """Get a roster entry by ID.
 
         Args:
-            slot_index: Slot to clear.
+            persona_id: Persona ID to look up.
 
         Returns:
-            The removed persona.
+            RosterEntry.
 
         Raises:
-            RosterError: If slot is already empty.
+            EntryNotFoundError: If entry not found.
         """
-        if slot_index < 0 or slot_index >= self.MAX_SLOTS:
-            raise RosterError(f"Invalid slot index: {slot_index}")
+        entry = self._entries.get(persona_id)
+        if entry is None:
+            raise EntryNotFoundError(f"Persona '{persona_id}' not found")
+        return entry
 
-        persona = self.slots[slot_index]
-        if persona is None:
-            raise RosterError(f"Slot {slot_index} is already empty")
-
-        self.slots[slot_index] = None
-        self._slot_metadata[slot_index] = {}
-
-        # Remove from collaboration matrix
-        pid = getattr(persona, "persona_id", str(slot_index))
-        keys_to_remove = [k for k in self.collaboration_matrix if pid in k]
-        for k in keys_to_remove:
-            del self.collaboration_matrix[k]
-
-        logger.info(
-            "Removed %s from slot %d",
-            getattr(persona, "artist_name", "Unknown"), slot_index,
-        )
-        return persona
-
-    def get_artist_by_slot(self, slot_index: int) -> Optional[Any]:
-        """Get the artist at a specific slot.
+    def update(self, persona_id: str, **kwargs: Any) -> RosterEntry:
+        """Update a roster entry.
 
         Args:
-            slot_index: Slot number.
+            persona_id: Persona ID to update.
+            **kwargs: Attributes to update.
 
         Returns:
-            GeneticPersona or None.
-        """
-        if 0 <= slot_index < self.MAX_SLOTS:
-            return self.slots[slot_index]
-        return None
+            Updated RosterEntry.
 
-    def get_artist_by_name(self, artist_name: str) -> Optional[Any]:
-        """Find an artist by name.
+        Raises:
+            EntryNotFoundError: If entry not found.
+        """
+        entry = self.get(persona_id)
+        for key, value in kwargs.items():
+            if hasattr(entry, key):
+                setattr(entry, key, value)
+        entry.updated_at = datetime.now().isoformat()
+        return entry
+
+    def delete(self, persona_id: str) -> bool:
+        """Delete a roster entry.
 
         Args:
-            artist_name: Artist name to search for.
+            persona_id: Persona ID to delete.
 
         Returns:
-            GeneticPersona or None.
+            True if deleted, False if not found.
         """
-        for slot in self.slots.values():
-            if slot is not None and getattr(slot, "artist_name", "") == artist_name:
-                return slot
-        return None
-
-    def get_all_artists(self) -> List[Any]:
-        """Get all occupied slots.
-
-        Returns:
-            List of GeneticPersona objects.
-        """
-        return [s for s in self.slots.values() if s is not None]
-
-    def get_slot_info(self) -> List[SlotInfo]:
-        """Get information about all slots.
-
-        Returns:
-            List of SlotInfo objects.
-        """
-        result: List[SlotInfo] = []
-        for i in range(self.MAX_SLOTS):
-            persona = self.slots[i]
-            result.append(SlotInfo(
-                slot_index=i,
-                persona=persona,
-                status="occupied" if persona else "empty",
-                date_added=self._slot_metadata[i].get("date_added"),
-            ))
-        return result
-
-    # ------------------------------------------------------------------
-    # Mechanical filtering
-    # ------------------------------------------------------------------
-
-    def _find_empty_slot(self) -> Optional[int]:
-        """Find the first empty slot.
-
-        Returns:
-            Slot index or None if full.
-        """
-        for i in range(self.MAX_SLOTS):
-            if self.slots[i] is None:
-                return i
-        return None
-
-    def _is_duplicate(self, persona: Any) -> bool:
-        """Check if a similar persona already exists.
-
-        Args:
-            persona: Persona to check.
-
-        Returns:
-            True if a duplicate/similar artist exists.
-        """
-        name = getattr(persona, "artist_name", "").lower()
-        aliases = [a.lower() for a in getattr(persona, "aliases", [])]
-
-        for slot in self.slots.values():
-            if slot is None:
-                continue
-            slot_name = getattr(slot, "artist_name", "").lower()
-            slot_aliases = [a.lower() for a in getattr(slot, "aliases", [])]
-
-            if slot_name == name:
-                return True
-            if name in slot_aliases or slot_name in aliases:
-                return True
-
+        if persona_id in self._entries:
+            del self._entries[persona_id]
+            logger.info("Deleted roster entry: %s", persona_id)
+            return True
         return False
 
-    def _find_similar(self, persona: Any) -> str:
-        """Find the name of a similar existing artist.
-
-        Args:
-            persona: Persona to compare.
+    def list_all(self) -> List[RosterEntry]:
+        """List all roster entries.
 
         Returns:
-            Name of similar artist.
+            List of all entries.
         """
-        name = getattr(persona, "artist_name", "Unknown")
-        for slot in self.slots.values():
-            if slot is not None:
-                return getattr(slot, "artist_name", "Unknown")
-        return "Unknown"
+        return list(self._entries.values())
 
-    # ------------------------------------------------------------------
-    # Collaboration matrix
-    # ------------------------------------------------------------------
-
-    def calculate_compatibility(self, artist_a: str, artist_b: str) -> float:
-        """Calculate compatibility between two artists by name.
-
-        Uses cosine similarity of stylistic signature vectors.
-
-        Args:
-            artist_a: First artist name.
-            artist_b: Second artist name.
+    def count(self) -> int:
+        """Get total number of entries.
 
         Returns:
-            Affinity score (0.0-1.0).
+            Entry count.
+        """
+        return len(self._entries)
+
+    # --- Genealogy ---
+
+    def register_parent_child(
+        self,
+        parent_id: str,
+        child_id: str,
+    ) -> None:
+        """Register a parent-child relationship.
+
+        Args:
+            parent_id: Parent persona ID.
+            child_id: Child persona ID.
 
         Raises:
-            RosterError: If either artist is not in the roster.
+            EntryNotFoundError: If either entry not found.
         """
-        persona_a = self.get_artist_by_name(artist_a)
-        persona_b = self.get_artist_by_name(artist_b)
+        parent = self.get(parent_id)
+        child = self.get(child_id)
 
-        if persona_a is None:
-            raise RosterError(f"Artist not in roster: {artist_a}")
-        if persona_b is None:
-            raise RosterError(f"Artist not in roster: {artist_b}")
+        parent.add_child(child_id)
+        child.add_parent(parent_id)
 
-        vec_a = _extract_signature_vector(persona_a)
-        vec_b = _extract_signature_vector(persona_b)
+        # Update child's generation
+        if parent.generation >= child.generation:
+            child.generation = parent.generation + 1
 
-        similarity = cosine_similarity(vec_a, vec_b)
-        # Normalize to 0-1
-        affinity = (similarity + 1.0) / 2.0
-
-        # Blend with collaboration affinities
-        collab_a = getattr(persona_a, "collaboration_affinity", 0.5)
-        collab_b = getattr(persona_b, "collaboration_affinity", 0.5)
-        blended = affinity * 0.7 + ((collab_a + collab_b) / 2.0) * 0.3
-
-        return round(max(0.0, min(1.0, blended)), 4)
-
-    def _update_collaboration_for_artist(self, persona: Any) -> None:
-        """Update collaboration scores for a newly added artist.
+    def get_ancestors(
+        self,
+        persona_id: str,
+        max_depth: int = 5,
+    ) -> List[str]:
+        """Get ancestor IDs for a persona.
 
         Args:
-            persona: The new artist.
-        """
-        name = getattr(persona, "artist_name", "")
-        for slot in self.slots.values():
-            if slot is None or slot is persona:
-                continue
-            other_name = getattr(slot, "artist_name", "")
-            if other_name:
-                try:
-                    score = self.calculate_compatibility(name, other_name)
-                    key = tuple(sorted([name, other_name]))
-                    self.collaboration_matrix[key] = score
-                except RosterError:
-                    pass
-
-    def build_full_collaboration_matrix(self) -> Dict[Tuple[str, str], float]:
-        """Build complete collaboration matrix for all pairs.
+            persona_id: Persona to query.
+            max_depth: Maximum ancestor depth.
 
         Returns:
-            Dict mapping (name_a, name_b) -> affinity score.
+            List of ancestor IDs.
         """
-        artists = self.get_all_artists()
-        names = [getattr(a, "artist_name", "") for a in artists if a]
-
-        for i, name_a in enumerate(names):
-            for name_b in names[i + 1:]:
+        ancestors = []
+        current_gen = [persona_id]
+        for _ in range(max_depth):
+            next_gen = []
+            for pid in current_gen:
                 try:
-                    score = self.calculate_compatibility(name_a, name_b)
-                    key = tuple(sorted([name_a, name_b]))
-                    self.collaboration_matrix[key] = score
-                except RosterError:
+                    entry = self.get(pid)
+                    for parent_id in entry.parent_ids:
+                        if parent_id not in ancestors:
+                            ancestors.append(parent_id)
+                            next_gen.append(parent_id)
+                except EntryNotFoundError:
                     pass
+            current_gen = next_gen
+            if not current_gen:
+                break
+        return ancestors
 
-        return self.collaboration_matrix
-
-    def get_collaboration_pairs(self, threshold: float = 0.5) -> List[Tuple[str, str, float]]:
-        """Get all artist pairs with affinity above threshold.
+    def get_descendants(
+        self,
+        persona_id: str,
+        max_depth: int = 5,
+    ) -> List[str]:
+        """Get descendant IDs for a persona.
 
         Args:
-            threshold: Minimum affinity score (default 0.5).
+            persona_id: Persona to query.
+            max_depth: Maximum descendant depth.
 
         Returns:
-            List of (name_a, name_b, score) tuples.
+            List of descendant IDs.
         """
-        return [
-            (key[0], key[1], score)
-            for key, score in self.collaboration_matrix.items()
-            if score >= threshold
-        ]
+        descendants = []
+        current_gen = [persona_id]
+        for _ in range(max_depth):
+            next_gen = []
+            for pid in current_gen:
+                try:
+                    entry = self.get(pid)
+                    for child_id in entry.child_ids:
+                        if child_id not in descendants:
+                            descendants.append(child_id)
+                            next_gen.append(child_id)
+                except EntryNotFoundError:
+                    pass
+            current_gen = next_gen
+            if not current_gen:
+                break
+        return descendants
 
-    def get_best_collaboration(self) -> Optional[Tuple[str, str, float]]:
-        """Get the highest-scoring collaboration pair.
+    def get_siblings(self, persona_id: str) -> List[str]:
+        """Get sibling IDs for a persona.
+
+        Args:
+            persona_id: Persona to query.
 
         Returns:
-            (name_a, name_b, score) or None.
+            List of sibling IDs.
         """
-        if not self.collaboration_matrix:
-            return None
-        best_key = max(self.collaboration_matrix, key=self.collaboration_matrix.get)
-        return (best_key[0], best_key[1], self.collaboration_matrix[best_key])
+        try:
+            entry = self.get(persona_id)
+            siblings = []
+            for parent_id in entry.parent_ids:
+                try:
+                    parent = self.get(parent_id)
+                    for child_id in parent.child_ids:
+                        if child_id != persona_id and child_id not in siblings:
+                            siblings.append(child_id)
+                except EntryNotFoundError:
+                    pass
+            return siblings
+        except EntryNotFoundError:
+            return []
 
-    # ------------------------------------------------------------------
-    # Taxonomy & metadata
-    # ------------------------------------------------------------------
+    def get_family_tree(
+        self,
+        persona_id: str,
+    ) -> Dict[str, List[str]]:
+        """Get complete family tree for a persona.
 
-    def get_genre_distribution(self) -> Dict[str, int]:
-        """Get distribution of genres in roster.
+        Args:
+            persona_id: Persona to query.
 
         Returns:
-            Dict mapping genre to count.
+            Dictionary with ancestors, descendants, and siblings.
         """
-        dist: Dict[str, int] = {}
-        for slot in self.slots.values():
-            if slot is not None:
-                genre = getattr(slot, "genre_anchor", "Unknown")
-                dist[genre] = dist.get(genre, 0) + 1
-        return dist
-
-    def get_era_distribution(self) -> Dict[str, int]:
-        """Get distribution of eras in roster.
-
-        Returns:
-            Dict mapping era to count.
-        """
-        dist: Dict[str, int] = {}
-        for slot in self.slots.values():
-            if slot is not None:
-                era = getattr(slot, "era", "Unknown")
-                dist[era] = dist.get(era, 0) + 1
-        return dist
-
-    def get_regional_distribution(self) -> Dict[str, int]:
-        """Get distribution of regional origins.
-
-        Returns:
-            Dict mapping region to count.
-        """
-        dist: Dict[str, int] = {}
-        for slot in self.slots.values():
-            if slot is not None:
-                region = getattr(slot, "regional_origin", "Unknown")
-                if region:
-                    dist[region] = dist.get(region, 0) + 1
-        return dist
-
-    def get_roster_summary(self) -> Dict[str, Any]:
-        """Get comprehensive roster summary.
-
-        Returns:
-            Summary dictionary.
-        """
-        artists = self.get_all_artists()
         return {
-            "total_slots": self.MAX_SLOTS,
-            "occupied": len(artists),
-            "available": self.MAX_SLOTS - len(artists),
-            "genre_distribution": self.get_genre_distribution(),
-            "era_distribution": self.get_era_distribution(),
-            "regional_distribution": self.get_regional_distribution(),
-            "collaboration_pairs": len(self.get_collaboration_pairs(0.5)),
-            "best_collaboration": self.get_best_collaboration(),
-            "artist_names": [getattr(a, "artist_name", "Unknown") for a in artists],
+            "persona_id": persona_id,
+            "ancestors": self.get_ancestors(persona_id),
+            "descendants": self.get_descendants(persona_id),
+            "siblings": self.get_siblings(persona_id),
         }
+
+    def get_lineage(
+        self,
+        persona_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Get detailed lineage info with entry data.
+
+        Args:
+            persona_id: Persona to query.
+
+        Returns:
+            List of lineage entries.
+        """
+        lineage = []
+        ancestor_ids = self.get_ancestors(persona_id, max_depth=10)
+        for aid in ancestor_ids:
+            try:
+                entry = self.get(aid)
+                lineage.append({
+                    "persona_id": aid,
+                    "artist_name": entry.artist_name,
+                    "generation": entry.generation,
+                    "tier": entry.tier.value,
+                    "overall_rating": entry.overall_rating,
+                })
+            except EntryNotFoundError:
+                lineage.append({
+                    "persona_id": aid,
+                    "artist_name": "[unknown]",
+                    "generation": -1,
+                    "tier": "unknown",
+                    "overall_rating": 0.0,
+                })
+        return lineage
+
+    # --- Queries ---
+
+    def query(self, query_spec: RosterQuery) -> List[RosterEntry]:
+        """Execute a roster query.
+
+        Args:
+            query_spec: Query specification.
+
+        Returns:
+            List of matching entries.
+        """
+        results = list(self._entries.values())
+
+        # Apply filters
+        for field, value in query_spec.filters.items():
+            results = [
+                e for e in results
+                if getattr(e, field, None) == value
+            ]
+
+        # Skill range
+        if query_spec.skill_min is not None:
+            results = [e for e in results if e.overall_rating >= query_spec.skill_min]
+        if query_spec.skill_max is not None:
+            results = [e for e in results if e.overall_rating <= query_spec.skill_max]
+
+        # Generation filter
+        if query_spec.generations is not None:
+            results = [e for e in results if e.generation in query_spec.generations]
+
+        # Tier filter
+        if query_spec.tiers is not None:
+            results = [e for e in results if e.tier in query_spec.tiers]
+
+        # Status filter
+        if query_spec.statuses is not None:
+            results = [e for e in results if e.status in query_spec.statuses]
+
+        # Apply limit/offset
+        results = results[query_spec.offset:query_spec.offset + query_spec.limit]
+
+        return results
+
+    def get_by_tier(self, tier: PersonaTier) -> List[RosterEntry]:
+        """Get all entries of a specific tier.
+
+        Args:
+            tier: Tier to filter by.
+
+        Returns:
+            List of matching entries.
+        """
+        return [e for e in self._entries.values() if e.tier == tier]
+
+    def get_by_status(self, status: PersonaStatus) -> List[RosterEntry]:
+        """Get all entries with a specific status.
+
+        Args:
+            status: Status to filter by.
+
+        Returns:
+            List of matching entries.
+        """
+        return [e for e in self._entries.values() if e.status == status]
+
+    def get_by_generation(self, generation: int) -> List[RosterEntry]:
+        """Get all entries from a specific generation.
+
+        Args:
+            generation: Generation number.
+
+        Returns:
+            List of matching entries.
+        """
+        return [e for e in self._entries.values() if e.generation == generation]
+
+    def get_top_rated(self, n: int = 10) -> List[RosterEntry]:
+        """Get top-rated personas.
+
+        Args:
+            n: Number to return.
+
+        Returns:
+            List of top-rated entries.
+        """
+        sorted_entries = sorted(
+            self._entries.values(),
+            key=lambda e: e.overall_rating,
+            reverse=True,
+        )
+        return sorted_entries[:n]
+
+    # --- Import/Export ---
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize roster to dictionary.
+        """Serialize full roster to dictionary.
 
         Returns:
-            Dictionary representation.
+            Dictionary with all entries and metadata.
         """
         return {
-            "slots": {
-                str(i): {
-                    "artist": getattr(s, "artist_name", None) if s else None,
-                    "persona_id": getattr(s, "persona_id", None) if s else None,
-                }
-                for i, s in self.slots.items()
-            },
-            "collaboration_matrix": {
-                f"{k[0]}|{k[1]}": v
-                for k, v in self.collaboration_matrix.items()
-            },
+            "entries": {k: v.to_dict() for k, v in self._entries.items()},
+            "count": len(self._entries),
+            "exported_at": datetime.now().isoformat(),
         }
 
+    def to_json(self, indent: int = 2) -> str:
+        """Serialize roster to JSON string.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Roster Manager module loaded successfully.")
+        Args:
+            indent: JSON indentation.
 
-    roster = RosterManager()
-    GeneticPersona, VoiceDifferentiationParameters = _get_genetic_persona_class()
+        Returns:
+            JSON string.
+        """
+        return json.dumps(self.to_dict(), indent=indent, default=str)
 
-    # Add some artists
-    artists = [
-        GeneticPersona(
-            artist_name="Lil Durk", aliases=["Durkio"],
-            genre_anchor="Hip-Hop", sub_genre_tags=["melodic drill"],
-            era="2020s", regional_origin="Chicago, IL",
-            voice_params=VoiceDifferentiationParameters(
-                vocabulary_tier="Street", slang_density="High",
-                emotional_range="Extreme", cultural_markers="Chicago",
-            ),
-            entropy_level=0.45, collaboration_affinity=0.7,
-        ),
-        GeneticPersona(
-            artist_name="Lil Baby", aliases=["4PF"],
-            genre_anchor="Hip-Hop", sub_genre_tags=["trap", "melodic"],
-            era="2020s", regional_origin="Atlanta, GA",
-            voice_params=VoiceDifferentiationParameters(
-                vocabulary_tier="Street", slang_density="High",
-                emotional_range="Wide", cultural_markers="Atlanta",
-            ),
-            entropy_level=0.5, collaboration_affinity=0.8,
-        ),
-        GeneticPersona(
-            artist_name="Tay B", aliases=["Tay"],
-            genre_anchor="Hip-Hop", sub_genre_tags=["melodic rap", "piano"],
-            era="2020s", regional_origin="Kentucky",
-            voice_params=VoiceDifferentiationParameters(
-                vocabulary_tier="Mixed", slang_density="Medium",
-                emotional_range="Wide", cultural_markers="Kentucky",
-            ),
-            entropy_level=0.5, collaboration_affinity=0.6,
-        ),
-    ]
+    def export_to_file(self, filepath: str) -> None:
+        """Export roster to JSON file.
 
-    for artist in artists:
-        slot = roster.add_artist(artist)
-        print(f"  Added {artist.artist_name} -> slot {slot}")
+        Args:
+            filepath: Output file path.
+        """
+        with open(filepath, "w") as f:
+            f.write(self.to_json())
+        logger.info("Roster exported to %s (%d entries)", filepath, len(self._entries))
 
-    print(f"\nRoster: {roster.get_roster_summary()}")
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> RosterManager:
+        """Deserialize roster from dictionary.
 
-    # Test collaboration scoring
-    score = roster.calculate_compatibility("Lil Durk", "Lil Baby")
-    print(f"\nLil Durk <-> Lil Baby compatibility: {score:.4f}")
+        Args:
+            data: Dictionary representation.
 
-    score2 = roster.calculate_compatibility("Lil Durk", "Tay B")
-    print(f"Lil Durk <-> Tay B compatibility: {score2:.4f}")
+        Returns:
+            RosterManager instance.
+        """
+        manager = cls()
+        for entry_id, entry_data in data.get("entries", {}).items():
+            entry = RosterEntry.from_dict(entry_data)
+            manager._entries[entry.persona_id] = entry
+        return manager
 
-    print(f"\nTop collaborations (threshold=0.5):")
-    for a, b, s in roster.get_collaboration_pairs(0.5):
-        print(f"  {a} + {b}: {s:.4f}")
+    @classmethod
+    def from_json(cls, json_str: str) -> RosterManager:
+        """Deserialize roster from JSON string.
+
+        Args:
+            json_str: JSON string.
+
+        Returns:
+            RosterManager instance.
+        """
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+    def import_from_file(self, filepath: str) -> int:
+        """Import roster from JSON file.
+
+        Args:
+            filepath: Input file path.
+
+        Returns:
+            Number of entries imported.
+        """
+        with open(filepath, "r") as f:
+            data = json.load(f)
+
+        imported = 0
+        for entry_id, entry_data in data.get("entries", {}).items():
+            entry = RosterEntry.from_dict(entry_data)
+            self._entries[entry.persona_id] = entry
+            imported += 1
+
+        logger.info("Imported %d entries from %s", imported, filepath)
+        return imported
+
+    # --- Validation ---
+
+    def validate(self) -> Dict[str, Any]:
+        """Validate roster integrity.
+
+        Checks:
+            - All parent/child references are valid
+            - No circular references
+            - Generations are consistent
+            - Skill values are in valid range
+
+        Returns:
+            Validation report.
+        """
+        report = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+            "entry_count": len(self._entries),
+        }
+
+        # Check parent/child references
+        for entry in self._entries.values():
+            for parent_id in entry.parent_ids:
+                if parent_id not in self._entries:
+                    report["warnings"].append(
+                        f"{entry.persona_id}: missing parent '{parent_id}'"
+                    )
+                else:
+                    parent = self._entries[parent_id]
+                    if entry.persona_id not in parent.child_ids:
+                        report["warnings"].append(
+                            f"{entry.persona_id}: not in parent's child list"
+                        )
+
+            for child_id in entry.child_ids:
+                if child_id not in self._entries:
+                    report["warnings"].append(
+                        f"{entry.persona_id}: missing child '{child_id}'"
+                    )
+
+            # Check skill values
+            for skill, value in entry.skills.items():
+                if not (0.0 <= value <= 1.0):
+                    report["errors"].append(
+                        f"{entry.persona_id}: skill '{skill}' out of range: {value}"
+                    )
+                    report["valid"] = False
+
+        return report
+
+    # --- Statistics ---
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get roster statistics.
+
+        Returns:
+            Statistics dictionary.
+        """
+        if not self._entries:
+            return {"total": 0}
+
+        ratings = [e.overall_rating for e in self._entries.values()]
+        generations = [e.generation for e in self._entries.values()]
+
+        tier_counts = {}
+        for tier in PersonaTier:
+            count = len([e for e in self._entries.values() if e.tier == tier])
+            if count > 0:
+                tier_counts[tier.value] = count
+
+        status_counts = {}
+        for status in PersonaStatus:
+            count = len([e for e in self._entries.values() if e.status == status])
+            if count > 0:
+                status_counts[status.value] = count
+
+        return {
+            "total": len(self._entries),
+            "avg_rating": sum(ratings) / len(ratings) if ratings else 0,
+            "max_rating": max(ratings) if ratings else 0,
+            "min_rating": min(ratings) if ratings else 0,
+            "max_generation": max(generations) if generations else 0,
+            "tier_distribution": tier_counts,
+            "status_distribution": status_counts,
+        }

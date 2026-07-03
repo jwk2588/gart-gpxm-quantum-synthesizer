@@ -1,1 +1,1 @@
-"""GART v3.0 + GPXM — gpxm package."""
+"""GPXM — Genetic Persona Xperience Manager for GART v3.0."""
