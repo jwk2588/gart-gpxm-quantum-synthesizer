@@ -1,0 +1,512 @@
+```mermaid
+%% GART v3.0 + GPXM - Full System Architecture
+%% INVERSION MODE: This diagram SPECIFIES code to be built
+%% Code Generation Agent: Consume this to produce Python classes
+%% @author: Architecture Designer (INVERSION MODE)
+%% @version: 3.0.0
+
+classDiagram
+    direction TB
+
+    %% ============================================================
+    %% CORE ORCHESTRATOR (Component 1)
+    %% ============================================================
+    class DualSwarmOrchestrator {
+        <<module>>
+        +swarm_alpha: LinguisticDAW
+        +swarm_omega: FrankensteinHiveMind
+        +sidechain: SidechainCompressor
+        +mixer: MasterMixerEvaluator
+        +tournament_engine: TournamentEngine
+        +resilience_engine: AdaptiveResilienceEngine
+        +cross_platform_adapter: CrossPlatformAdapter
+        +__init__(config: OrchestratorConfig) None
+        +run_tournament(artist_pool: List[GeneticPersona], matchup_config: MatchupConfig) TournamentResult
+        +coordinate_battle(protagonist: GeneticPersona, antagonist: GeneticPersona) BattleResult
+        +initiate_cypher_session(persona: GeneticPersona, prompt_chain: PromptChain) CypherResult
+        +orchestrate_dual_swarm() SwarmCoordinationResult
+        +evaluate_master_mix(cypher_outputs: List[CypherResult]) MixEvaluation
+        +adapt_resilience(feedback: SystemFeedback) AdaptationResult
+        +distribute_cross_platform(content: GeneratedContent, platforms: List[Platform]) DistributionResult
+    }
+
+    %% ============================================================
+    %% LLLM NEURAL CORE (Component 2)
+    %% ============================================================
+    class LLLM_Architecture {
+        <<module>>
+        +v1_encoder: nn.TransformerEncoderLayer
+        +v2_encoder: nn.TransformerEncoderLayer
+        +cross_attention: nn.MultiheadAttention
+        +decoder: nn.Linear
+        +layer_norm: nn.LayerNorm
+        +dropout: nn.Dropout
+        +d_model: int
+        +vocab_size: int
+        +nhead: int
+        +num_layers: int
+        +__init__(d_model: int, vocab_size: int, nhead: int, num_layers: int, dropout_v1: float, dropout_v2: float) None
+        +forward(v1_input: Tensor, v2_input: Tensor) Tensor
+        +_encode_v1(x: Tensor) Tensor
+        +_encode_v2(x: Tensor) Tensor
+        +_cross_attend(v1_encoded: Tensor, v2_encoded: Tensor) Tensor
+        +_decode(context: Tensor) Tensor
+        +generate(prompt: Tensor, max_length: int, temperature: float) Tensor
+        +save_checkpoint(path: str) None
+        +load_checkpoint(path: str) None
+    }
+
+    class LLLM_TrainingPipeline {
+        <<module>>
+        +model: LLLM_Architecture
+        +optimizer: torch.optim.AdamW
+        +scheduler: torch.optim.lr_scheduler.CosineAnnealingLR
+        +loss_fn: nn.CrossEntropyLoss
+        +train_dataloader: DataLoader
+        +val_dataloader: DataLoader
+        +__init__(model: LLLM_Architecture, config: TrainingConfig) None
+        +train_epoch() float
+        +validate() float
+        +fit(epochs: int) TrainingHistory
+        +_compute_loss(logits: Tensor, targets: Tensor) Tensor
+    }
+
+    %% ============================================================
+    %% GPXM PERSONA SYSTEM (Component 3)
+    %% ============================================================
+    class GeneticPersona {
+        <<module>>
+        +persona_id: UUID
+        +identity_core: IdentityCore
+        +soundcloud_layer: SoundCloudLayer
+        +youtube_layer: YouTubeLayer
+        +agentic_layer: AgenticProcessingLayer
+        +memory_bank: ExpansiveMemoryBank
+        +entropic_scripts: List[EntropicScript]
+        +genetic_fitness: float
+        +generation: int
+        +lineage: List[UUID]
+        +__init__(seed_identity: IdentitySeed) None
+        +evolve(mutation_rate: float) GeneticPersona
+        +crossover(partner: GeneticPersona) GeneticPersona
+        +calculate_fitness() float
+        +ingest_data(source: DataSource) IngestionResult
+        +generate_cypher(prompt_chain: PromptChain) CypherResult
+        +clone() GeneticPersona
+        +to_dict() Dict[str, Any]
+        +from_dict(data: Dict[str, Any]) GeneticPersona
+    }
+
+    class IdentityCore {
+        <<module>>
+        +persona_name: str
+        +artist_alias: str
+        +origin_story: str
+        +stylistic_signature: StylisticSignature
+        +core_values: List[str]
+        +__init__(seed: IdentitySeed) None
+        +mutate(mutation_rate: float) None
+        +serialize() Dict[str, Any]
+    }
+
+    class StylisticSignature {
+        <<module>>
+        +rhythm_profile: RhythmProfile
+        +vocabulary_richness: float
+        +thematic_tendencies: List[str]
+        +metaphor_density: float
+        +cadence_pattern: CadencePattern
+        +__init__(profile_data: Dict[str, Any]) None
+        +evolve(mutation_rate: float) None
+        +compare(other: StylisticSignature) float
+    }
+
+    class ExpansiveMemoryBank {
+        <<module>>
+        +short_term: SessionMemory
+        +medium_term: ProjectMemory
+        +long_term: CoreIdentityMemory
+        +episodic: EventMemory
+        +semantic: KnowledgeMemory
+        +consolidation_interval: int
+        +__init__(config: MemoryConfig) None
+        +store(session_data: SessionData) None
+        +retrieve(query: MemoryQuery) List[MemoryRecord]
+        +consolidate() ConsolidationResult
+        +_consolidate_short_to_medium() None
+        +_consolidate_medium_to_long() None
+        +_update_semantic_index() None
+        +get_memory_stats() MemoryStats
+        +prune_stale_memories(threshold: float) int
+    }
+
+    class SessionMemory {
+        <<module>>
+        +entries: Deque[MemoryEntry]
+        +max_size: int
+        +ttl: timedelta
+        +__init__(max_size: int, ttl: timedelta) None
+        +add(entry: MemoryEntry) None
+        +get_recent(n: int) List[MemoryEntry]
+        +flush() List[MemoryEntry]
+    }
+
+    class ProjectMemory {
+        <<module>>
+        +entries: List[MemoryEntry]
+        +project_context: Dict[str, Any]
+        +__init__() None
+        +add(entry: MemoryEntry) None
+        +search(query: str) List[MemoryEntry]
+        +summarize() str
+    }
+
+    class CoreIdentityMemory {
+        <<module>>
+        +core_beliefs: List[str]
+        +stylistic_evolution: List[StyleSnapshot]
+        +identity_anchors: List[str]
+        +__init__() None
+        +update(belief: str, confidence: float) None
+        +get_identity_digest() str
+    }
+
+    class EventMemory {
+        <<module>>
+        +episodes: List[Episode]
+        +__init__() None
+        +record_episode(event: Event) None
+        +recall_similar(query: EventQuery) List[Episode]
+    }
+
+    class KnowledgeMemory {
+        <<module>>
+        +knowledge_graph: KnowledgeGraph
+        +__init__() None
+        +index_fact(fact: Fact) None
+        +query(subject: str) List[Fact]
+    }
+
+    %% ============================================================
+    %% DAW UTILITIES (Component 4)
+    %% ============================================================
+    class DAW_SubAgent_Utilities {
+        <<module>>
+        +ybnba_kick: VerseStem
+        +hive_mind_synth: VerseStem
+        +bpm_range: Tuple[int, int]
+        +eq_profile: EQProfile
+        +reverb_config: ReverbConfig
+        +__init__(config: DAWConfig) None
+        +sidechain_compressor_agent(input_signal: Signal, sidechain_input: Signal) Signal
+        +dynamic_bpm_cadence_shifter(text_sequence: str, target_bpm: int) CadenceShiftedText
+        +master_mixer_evaluator(final_cypher: CypherResult) MixedCypher
+        +_apply_eq(signal: Signal, eq_profile: EQProfile) Signal
+        +_apply_limiter(signal: Signal, threshold: float) Signal
+        +_apply_reverb_tail(signal: Signal, tail_length: float) Signal
+        +generate_ybnba_kick_pattern(bar_count: int) Pattern
+        +generate_hive_synth_riff(mood: str) Riff
+        +measure_semantic_weight(text: str) float
+        +duck_frequency_range(signal: Signal, freq_range: Tuple[float, float]) Signal
+    }
+
+    class VerseStem {
+        <<module>>
+        +name: str
+        +pattern: Pattern
+        +instrument: str
+        +bpm: int
+        +key: str
+        +__init__(name: str, pattern: Pattern, instrument: str) None
+        +render() AudioBuffer
+        +transpose(semitones: int) None
+        +change_bpm(new_bpm: int) None
+    }
+
+    class Pattern {
+        <<module>>
+        +notes: List[Note]
+        +duration_beats: float
+        +__init__(notes: List[Note]) None
+        +quantize(grid_size: float) None
+        +humanize(amount: float) None
+    }
+
+    %% ============================================================
+    %% INVERSION AGENT (Component 5)
+    %% ============================================================
+    class DiagramToCodeInversionAgent {
+        <<module>>
+        +mermaid_parser: MermaidASTParser
+        +code_generator: PythonCodeGenerator
+        +relationship_mapper: RelationshipMapper
+        +template_engine: TemplateEngine
+        +output_formatter: OutputFormatter
+        +__init__(config: InversionConfig) None
+        +generate_classes(mermaid_source: str) List[PythonClass]
+        +generate_methods(node: ASTNode) List[PythonMethod]
+        +map_inheritance(edges: List[Edge]) Dict[str, str]
+        +map_composition(edges: List[Edge]) Dict[str, List[str]]
+        +parse_mermaid(mermaid_source: str) MermaidAST
+        +emit_python(ast: MermaidAST) str
+        +validate_output(python_code: str) ValidationResult
+        +generate_from_file(filepath: str) str
+    }
+
+    class MermaidASTParser {
+        <<module>>
+        +grammar: Grammar
+        +lexer: Lexer
+        +__init__() None
+        +parse(source: str) MermaidAST
+        +tokenize(source: str) List[Token]
+        +build_ast(tokens: List[Token]) MermaidAST
+    }
+
+    class PythonCodeGenerator {
+        <<module>>
+        +templates: Dict[str, Template]
+        +type_map: Dict[str, str]
+        +__init__(config: GeneratorConfig) None
+        +generate_class(class_def: ClassDefinition) str
+        +generate_method(method_def: MethodDefinition) str
+        +generate_imports(classes: List[ClassDefinition]) str
+        +apply_styling_conventions(code: str) str
+    }
+
+    class RelationshipMapper {
+        <<module>>
+        +inheritance_map: Dict[str, str]
+        +composition_map: Dict[str, List[str]]
+        +association_map: Dict[str, List[str]]
+        +__init__() None
+        +map_relationships(ast: MermaidAST) RelationshipGraph
+        +resolve_dependencies() List[str]
+    }
+
+    %% ============================================================
+    %% ADAPTIVE RESILIENCE ENGINE (Component 6)
+    %% ============================================================
+    class AdaptiveResilienceEngine {
+        <<module>>
+        +entropy_regulator: EntropyRegulator
+        +feedback_loops: List[FeedbackLoop]
+        +degradation_controller: GracefulDegradation
+        +moore_growth_rate: float
+        +murphy_failure_prob: float
+        +adaptation_history: List[AdaptationEvent]
+        +__init__(config: ResilienceConfig) None
+        +adapt(feedback: SystemFeedback) AdaptationResult
+        +regulate_entropy(current_entropy: float) float
+        +process_feedback(feedback: SystemFeedback) None
+        +compute_moore_murphy_balance() float
+        +initiate_graceful_degradation() DegradationPlan
+        +recover_from_failure(failure: FailureEvent) RecoveryResult
+        +predict_failure_risk() float
+    }
+
+    class EntropyRegulator {
+        <<module>>
+        +target_entropy: float
+        +current_entropy: float
+        +regulation_strategy: RegulationStrategy
+        +__init__(target: float) None
+        +measure(system_state: SystemState) float
+        +adjust(delta: float) None
+        +get_status() RegulationStatus
+    }
+
+    class GracefulDegradation {
+        <<module>>
+        +degradation_levels: List[DegradationLevel]
+        +current_level: int
+        +__init__(levels: List[DegradationLevel]) None
+        +step_down() None
+        +step_up() None
+        +get_current_capabilities() List[str]
+    }
+
+    class FeedbackLoop {
+        <<module>>
+        +loop_id: UUID
+        +sensor: Sensor
+        +actuator: Actuator
+        +controller: PIDController
+        +__init__(config: LoopConfig) None
+        +cycle() LoopResult
+        +tune_gains(kp: float, ki: float, kd: float) None
+    }
+
+    %% ============================================================
+    %% CROSS-PLATFORM ADAPTER (Component 7)
+    %% ============================================================
+    class CrossPlatformAdapter {
+        <<module>>
+        +platform_transformers: Dict[Platform, ContentTransformer]
+        +platform_registry: PlatformRegistry
+        +__init__(config: AdapterConfig) None
+        +distribute(content: GeneratedContent, platforms: List[Platform]) Dict[Platform, FormattedContent]
+        +adapt_tone(content: GeneratedContent, platform: Platform) AdaptedContent
+        +register_platform(platform: Platform, transformer: ContentTransformer) None
+        +get_platform_requirements(platform: Platform) PlatformRequirements
+        +batch_distribute(content_batch: List[GeneratedContent], platforms: List[Platform]) BatchDistributionResult
+    }
+
+    class ContentTransformer {
+        <<abstract>>
+        +platform: Platform
+        +__init__(platform: Platform) None
+        +transform(content: GeneratedContent) FormattedContent*
+        +validate(content: FormattedContent) ValidationResult*
+    }
+
+    class SoundCloudTransformer {
+        +max_duration: int
+        +supported_formats: List[str]
+        +transform(content: GeneratedContent) FormattedContent
+        +validate(content: FormattedContent) ValidationResult
+    }
+
+    class YouTubeTransformer {
+        +max_duration: int
+        +thumbnail_specs: ThumbnailSpecs
+        +transform(content: GeneratedContent) FormattedContent
+        +validate(content: FormattedContent) ValidationResult
+    }
+
+    class InstagramTransformer {
+        +aspect_ratios: List[str]
+        +max_caption_length: int
+        +transform(content: GeneratedContent) FormattedContent
+        +validate(content: FormattedContent) ValidationResult
+    }
+
+    %% ============================================================
+    %% TOURNAMENT ENGINE (Component 8)
+    %% ============================================================
+    class TournamentEngine {
+        <<module>>
+        +artist_pool: List[GeneticPersona]
+        +max_pool_size: int
+        +matchup_simulator: MatchupSimulator
+        +scoring_engine: ScoringEngine
+        +bracket: TournamentBracket
+        +history: List[TournamentResult]
+        +__init__(config: TournamentConfig) None
+        +run_tournament() TournamentResult
+        +seed_bracket() TournamentBracket
+        +simulate_matchup(a: GeneticPersona, b: GeneticPersona) MatchResult
+        +calculate_goat_metrics(certs_total: int, certs_in_day: int) float
+        +update_elo_ratings(result: MatchResult) None
+        +get_leaderboard() List[LeaderboardEntry]
+        +export_bracket() BracketVisualization
+    }
+
+    class MatchupSimulator {
+        <<module>>
+        +evaluation_criteria: List[Criterion]
+        +lllm_judge: LLLM_Architecture
+        +__init__(criteria: List[Criterion], judge: LLLM_Architecture) None
+        +simulate(a: GeneticPersona, b: GeneticPersona) MatchResult
+        +evaluate_round(cyphers: List[CypherResult]) RoundScores
+        +break_tie(a: GeneticPersona, b: GeneticPersona) GeneticPersona
+    }
+
+    class ScoringEngine {
+        <<module>>
+        +weights: Dict[str, float]
+        +scoring_functions: Dict[str, Callable]
+        +__init__(weights: Dict[str, float]) None
+        +score(cypher: CypherResult) float
+        +aggregate_scores(scores: List[float]) float
+        +normalize(score: float, min_val: float, max_val: float) float
+    }
+
+    class TournamentBracket {
+        <<module>>
+        +rounds: List[Round]
+        +participants: List[GeneticPersona]
+        +current_round: int
+        +__init__(participants: List[GeneticPersona]) None
+        +advance_winners(results: List[MatchResult]) None
+        +get_current_matchups() List[Tuple[GeneticPersona, GeneticPersona]]
+        +is_complete() bool
+    }
+
+    %% ============================================================
+    %% INHERITANCE RELATIONSHIPS
+    %% ============================================================
+    LLLM_TrainingPipeline --> LLLM_Architecture : trains
+    MatchupSimulator --> LLLM_Architecture : uses_as_judge
+
+    SoundCloudTransformer --|> ContentTransformer : extends
+    YouTubeTransformer --|> ContentTransformer : extends
+    InstagramTransformer --|> ContentTransformer : extends
+
+    %% ============================================================
+    %% COMPOSITION RELATIONSHIPS
+    %% ============================================================
+    DualSwarmOrchestrator *-- LLLM_Architecture : "neural_core"
+    DualSwarmOrchestrator *-- GeneticPersona : "artist_pool (0..16)"
+    DualSwarmOrchestrator *-- DAW_SubAgent_Utilities : "daw_pipeline"
+    DualSwarmOrchestrator *-- DiagramToCodeInversionAgent : "inversion_agent"
+    DualSwarmOrchestrator *-- AdaptiveResilienceEngine : "resilience"
+    DualSwarmOrchestrator *-- CrossPlatformAdapter : "distribution"
+    DualSwarmOrchestrator *-- TournamentEngine : "tournament"
+
+    GeneticPersona *-- IdentityCore : "identity_core"
+    GeneticPersona *-- ExpansiveMemoryBank : "memory_bank"
+    GeneticPersona *-- EntropicScript : "entropic_scripts (0..*)"
+
+    ExpansiveMemoryBank *-- SessionMemory : "short_term"
+    ExpansiveMemoryBank *-- ProjectMemory : "medium_term"
+    ExpansiveMemoryBank *-- CoreIdentityMemory : "long_term"
+    ExpansiveMemoryBank *-- EventMemory : "episodic"
+    ExpansiveMemoryBank *-- KnowledgeMemory : "semantic"
+
+    DAW_SubAgent_Utilities *-- VerseStem : "ybnba_kick"
+    DAW_SubAgent_Utilities *-- VerseStem : "hive_mind_synth"
+    VerseStem *-- Pattern : "pattern"
+
+    DiagramToCodeInversionAgent *-- MermaidASTParser : "mermaid_parser"
+    DiagramToCodeInversionAgent *-- PythonCodeGenerator : "code_generator"
+    DiagramToCodeInversionAgent *-- RelationshipMapper : "relationship_mapper"
+
+    AdaptiveResilienceEngine *-- EntropyRegulator : "entropy_regulator"
+    AdaptiveResilienceEngine *-- GracefulDegradation : "degradation_controller"
+    AdaptiveResilienceEngine *-- FeedbackLoop : "feedback_loops (1..*)"
+
+    CrossPlatformAdapter *-- ContentTransformer : "platform_transformers"
+
+    TournamentEngine *-- MatchupSimulator : "matchup_simulator"
+    TournamentEngine *-- ScoringEngine : "scoring_engine"
+    TournamentEngine *-- TournamentBracket : "bracket"
+    TournamentBracket o-- GeneticPersona : "participants"
+
+    %% ============================================================
+    %% ASSOCIATION RELATIONSHIPS
+    %% ============================================================
+    IdentityCore --> StylisticSignature : "stylistic_signature"
+    AdaptiveResilienceEngine ..> EntropyRegulator : "regulates"
+    ScoringEngine ..> CypherResult : "scores"
+
+    %% ============================================================
+    %% CODE GENERATION NOTES
+    %% ============================================================
+    note for DualSwarmOrchestrator "CODEGEN-HINT: @dataclass(slots=True). Implements Singleton pattern. Thread-safe with asyncio.Lock()"
+    note for LLLM_Architecture "CODEGEN-HINT: Extends nn.Module. Uses Xavier init. Support both CPU/CUDA. Grad checkpointing enabled."
+    note for GeneticPersona "CODEGEN-HINT: @dataclass. Implements deepcopy for evolution. UUID4 for persona_id. Fitness cached with @lru_cache."
+    note for ExpansiveMemoryBank "CODEGEN-HINT: Async consolidation. Background task using asyncio. Tiered TTL: ST=1h, MT=24h, LT=forever."
+    note for DAW_SubAgent_Utilities "CODEGEN-HINT: Pure functions preferred. Signal type = np.ndarray. BPM range (85, 128)."
+    note for DiagramToCodeInversionAgent "CODEGEN-HINT: Jinja2 templates. AST uses dict-based nodes. Supports both classDiagram and flowchart."
+    note for AdaptiveResilienceEngine "CODEGEN-HINT: Event-driven architecture. Observer pattern for feedback loops. Thread-safe state."
+    note for CrossPlatformAdapter "CODEGEN-HINT: Strategy pattern for transformers. Registry pattern for platforms."
+    note for TournamentEngine "CODEGEN-HINT: Elo rating system. Bracket visualization with graphviz. Export to JSON."
+
+    %% ============================================================
+    %% SYSTEM BOUNDARY
+    %% ============================================================
+    %% @codegen-boundary: All classes inside this diagram constitute the complete GART v3.0 + GPXM system
+    %% @codegen-entrypoint: DualSwarmOrchestrator is the main entry point
+    %% @codegen-init-order: LLLM_Architecture -> ExpansiveMemoryBank -> GeneticPersona -> DAW_SubAgent_Utilities -> TournamentEngine -> AdaptiveResilienceEngine -> CrossPlatformAdapter -> DiagramToCodeInversionAgent -> DualSwarmOrchestrator
+```
